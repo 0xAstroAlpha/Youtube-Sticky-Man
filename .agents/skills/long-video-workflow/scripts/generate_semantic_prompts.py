@@ -42,9 +42,9 @@ Return a strictly valid JSON array of objects, where each object has:
 - "visual": (string)
 """
 
-    print("Calling Gemini Flash API...")
+    print("Calling Gemini Pro API for high-quality scenes...")
     response = client.models.generate_content(
-        model='gemini-3.1-flash-lite',
+        model='gemini-3.1-pro-preview',
         contents=text_content,
         config=types.GenerateContentConfig(
             system_instruction=sys_instruction,

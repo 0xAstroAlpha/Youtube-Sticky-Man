@@ -53,13 +53,16 @@ async def stream_logs(request: Request, project_name: str, file_path: str, voice
             json_path = os.path.join(project_name, f"transcript_chunk_{chunk_index}.json")
             
             yield f"data: [INFO] >>> STEP 2: Running TTS for chunk {chunk_index}...\n\n"
-            tts_cmd = ["python", ".agents/skills/long-video-workflow/scripts/elevenlabs_tts_with_timestamps.py", "--input-file", chunk_path, "--voice-id", voice_id, "--model-id", model_id, "--out-audio", audio_path, "--out-json", json_path]
-            process = await asyncio.create_subprocess_exec(*tts_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
-            while True:
-                line = await process.stdout.readline()
-                if not line: break
-                yield f"data: {line.decode('utf-8').strip()}\n\n"
-            await process.wait()
+            if os.path.exists(audio_path) and os.path.exists(json_path):
+                yield f"data: [INFO] >>> Audio already exists for chunk {chunk_index}. Skipping ElevenLabs TTS to save credits.\n\n"
+            else:
+                tts_cmd = ["python", ".agents/skills/long-video-workflow/scripts/elevenlabs_tts_with_timestamps.py", "--input-file", chunk_path, "--voice-id", voice_id, "--model-id", model_id, "--out-audio", audio_path, "--out-json", json_path]
+                process = await asyncio.create_subprocess_exec(*tts_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+                while True:
+                    line = await process.stdout.readline()
+                    if not line: break
+                    yield f"data: {line.decode('utf-8').strip()}\n\n"
+                await process.wait()
             
             yield f"data: [INFO] >>> STEP 3: Generating Semantic Prompts for chunk {chunk_index}...\n\n"
             gemini_cmd = ["python", ".agents/skills/long-video-workflow/scripts/generate_semantic_prompts.py", "--chunk", chunk_index, "--transcript", json_path]
