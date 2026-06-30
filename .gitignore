@@ -1,0 +1,32 @@
+# Environments
+.env
+
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Auto-Generated Content (Avoid pushing heavy audio/video files)
+ep-*/
+output/
+archive/
+*.mp4
+*.mp3
+*.json
+*.txt
+*.zip
+
+# Ignore specific workflow text files EXCEPT SKILL.md
+!SKILL.md
+!AGENTS.md
+!tasks.md
+!requirements.txt
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# OS specific
+.DS_Store
+Thumbs.db

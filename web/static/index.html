@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto-Sticky-Man Studio</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="background-orbs">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1>Auto-Sticky-Man</h1>
+            <p class="subtitle">AI Doodle Animation Pipeline</p>
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('create-tab')">Create New</button>
+                <button class="tab-btn" onclick="switchTab('manage-tab'); fetchProjects();">Manage Projects</button>
+            </div>
+        </header>
+
+        <!-- CREATE NEW TAB -->
+        <main class="glass-panel tab-content active" id="create-tab">
+            <form id="upload-form">
+                <div class="form-group">
+                    <label for="script-file">Upload Script (.txt)</label>
+                    <div class="file-drop-area" id="drop-area">
+                        <span class="file-message">Drag & drop your script here or click to browse</span>
+                        <input type="file" id="script-file" name="file" accept=".txt" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="voice-id">ElevenLabs Voice ID</label>
+                        <input type="text" id="voice-id" name="voice_id" value="QzTKubutNn9TjrB7Xb2Q" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="model-id">ElevenLabs Model</label>
+                        <input type="text" id="model-id" name="model_id" value="eleven_v3" required>
+                    </div>
+                </div>
+
+                <button type="submit" id="generate-btn" class="glow-on-hover">
+                    <span class="btn-text">Generate Video Assets</span>
+                    <div class="spinner hidden" id="spinner"></div>
+                </button>
+            </form>
+            
+            <div class="terminal-container hidden" id="terminal-container">
+                <div class="terminal-header">
+                    <div class="dots">
+                        <span class="dot red"></span>
+                        <span class="dot yellow"></span>
+                        <span class="dot green"></span>
+                    </div>
+                    <span class="terminal-title">System Logs</span>
+                </div>
+                <div class="terminal-body" id="terminal"></div>
+            </div>
+        </main>
+
+        <!-- MANAGE PROJECTS TAB -->
+        <main class="glass-panel tab-content hidden" id="manage-tab">
+            <div class="project-selector">
+                <label for="project-list">Select Project:</label>
+                <select id="project-list" onchange="loadProjectDetails()"></select>
+                <button class="refresh-btn" onclick="fetchProjects()">Refresh</button>
+            </div>
+            
+            <div id="project-details" class="hidden">
+                <div class="chunks-grid" id="chunks-grid">
+                    <!-- Cards will be injected here -->
+                </div>
+                
+                <button id="stitch-btn" class="glow-on-hover disabled-btn" disabled onclick="stitchVideo()">
+                    <span class="stitch-btn-text">Stitch Final Video</span>
+                    <div class="spinner hidden" id="stitch-spinner"></div>
+                </button>
+            </div>
+            
+            <div class="terminal-container hidden" id="stitch-terminal-container">
+                <div class="terminal-header">
+                    <div class="dots">
+                        <span class="dot red"></span>
+                        <span class="dot yellow"></span>
+                        <span class="dot green"></span>
+                    </div>
+                    <span class="terminal-title">FFmpeg Stitch Engine Logs</span>
+                </div>
+                <div class="terminal-body" id="stitch-terminal"></div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

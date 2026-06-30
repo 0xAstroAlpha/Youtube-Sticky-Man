@@ -1,0 +1,307 @@
+const dropArea = document.getElementById('drop-area');
+const fileInput = document.getElementById('script-file');
+const fileMessage = document.querySelector('.file-message');
+const form = document.getElementById('upload-form');
+const generateBtn = document.getElementById('generate-btn');
+const btnText = document.querySelector('.btn-text');
+const spinner = document.getElementById('spinner');
+const terminalContainer = document.getElementById('terminal-container');
+const terminal = document.getElementById('terminal');
+
+// Tab Logic
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    
+    document.getElementById(tabId).classList.remove('hidden');
+    event.currentTarget.classList.add('active');
+}
+
+// Drag and drop effects
+['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+    dropArea.addEventListener(eventName, preventDefaults, false);
+});
+
+function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+}
+
+['dragenter', 'dragover'].forEach(eventName => {
+    dropArea.addEventListener(eventName, () => dropArea.classList.add('dragover'), false);
+});
+
+['dragleave', 'drop'].forEach(eventName => {
+    dropArea.addEventListener(eventName, () => dropArea.classList.remove('dragover'), false);
+});
+
+dropArea.addEventListener('drop', handleDrop, false);
+
+function handleDrop(e) {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+    fileInput.files = files;
+    updateFileMessage();
+}
+
+fileInput.addEventListener('change', updateFileMessage);
+
+function updateFileMessage() {
+    if (fileInput.files.length > 0) {
+        fileMessage.textContent = fileInput.files[0].name;
+        fileMessage.style.color = '#00f2fe';
+    } else {
+        fileMessage.textContent = 'Drag & drop your script here or click to browse';
+        fileMessage.style.color = 'var(--text-muted)';
+    }
+}
+
+function appendLog(element, text) {
+    const p = document.createElement('p');
+    p.textContent = text;
+    if (text.includes('[INFO]') || text.includes('>>>')) p.classList.add('info');
+    if (text.includes('[ERROR]') || text.includes('[WARNING]')) p.classList.add('error');
+    if (text.includes('[SUCCESS]')) p.classList.add('success');
+    element.appendChild(p);
+    element.scrollTop = element.scrollHeight;
+}
+
+// CREATE TAB SUBMISSION
+form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    if (fileInput.files.length === 0) {
+        alert('Please select a file first!');
+        return;
+    }
+
+    btnText.classList.add('hidden');
+    spinner.classList.remove('hidden');
+    generateBtn.disabled = true;
+    terminalContainer.classList.remove('hidden');
+    terminal.innerHTML = '';
+    
+    appendLog(terminal, '[SYSTEM] Initializing secure connection to Auto-Sticky-Man core...');
+
+    const formData = new FormData(form);
+    
+    try {
+        const response = await fetch('/api/process', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            appendLog(terminal, `[SYSTEM] Script uploaded successfully. Initializing workspace: ${data.project_name}`);
+            
+            const streamUrl = `/api/stream?project_name=${encodeURIComponent(data.project_name)}&file_path=${encodeURIComponent(data.file_path)}&voice_id=${encodeURIComponent(data.voice_id)}&model_id=${encodeURIComponent(data.model_id)}`;
+            const eventSource = new EventSource(streamUrl);
+            
+            eventSource.onmessage = function(event) {
+                if (event.data === '[DONE]') {
+                    eventSource.close();
+                    appendLog(terminal, '[SYSTEM] Execution Terminated Safely.');
+                    btnText.classList.remove('hidden');
+                    spinner.classList.add('hidden');
+                    generateBtn.disabled = false;
+                    btnText.textContent = "Pipeline Completed!";
+                    setTimeout(() => { btnText.textContent = "Generate Video Assets"; }, 3000);
+                } else {
+                    appendLog(terminal, event.data);
+                }
+            };
+            
+            eventSource.onerror = function(err) {
+                eventSource.close();
+                appendLog(terminal, '[ERROR] Connection to streaming server lost. Ensure backend is running.');
+                btnText.classList.remove('hidden');
+                spinner.classList.add('hidden');
+                generateBtn.disabled = false;
+            };
+            
+        } else {
+            appendLog(terminal, '[ERROR] Upload failed.');
+            btnText.classList.remove('hidden');
+            spinner.classList.add('hidden');
+            generateBtn.disabled = false;
+        }
+    } catch (err) {
+        appendLog(terminal, `[ERROR] ${err.message}`);
+        btnText.classList.remove('hidden');
+        spinner.classList.add('hidden');
+        generateBtn.disabled = false;
+    }
+});
+
+// MANAGE PROJECTS TAB
+async function fetchProjects() {
+    const selector = document.getElementById('project-list');
+    selector.innerHTML = '<option value="">Loading...</option>';
+    
+    try {
+        const res = await fetch('/api/projects');
+        const data = await res.json();
+        
+        selector.innerHTML = '<option value="">-- Select a project --</option>';
+        data.projects.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p;
+            opt.textContent = p.toUpperCase();
+            selector.appendChild(opt);
+        });
+        document.getElementById('project-details').classList.add('hidden');
+    } catch (e) {
+        selector.innerHTML = '<option value="">Error loading projects</option>';
+    }
+}
+
+async function loadProjectDetails() {
+    const projName = document.getElementById('project-list').value;
+    const grid = document.getElementById('chunks-grid');
+    const stitchBtn = document.getElementById('stitch-btn');
+    const detailsDiv = document.getElementById('project-details');
+    
+    if (!projName) {
+        detailsDiv.classList.add('hidden');
+        return;
+    }
+    
+    grid.innerHTML = '<div style="color: white">Scanning image folders and auditing pacing...</div>';
+    detailsDiv.classList.remove('hidden');
+    
+    try {
+        const res = await fetch(`/api/projects/${projName}`);
+        const data = await res.json();
+        
+        grid.innerHTML = '';
+        
+        data.chunks.forEach(c => {
+            const card = document.createElement('div');
+            card.className = `chunk-card ${c.ready ? 'ready' : 'waiting'}`;
+            
+            const auditClass = c.audit_pass ? 'audit-pass' : 'audit-fail';
+            const auditText = c.audit_pass ? `✅ Max pause: ${c.max_duration}s` : `⚠️ Long pause: ${c.max_duration}s`;
+            
+            card.innerHTML = `
+                <h3>Chunk ${c.chunk}</h3>
+                <div class="stats">
+                    <p>Prompts: <span>${c.prompts}</span></p>
+                    <p>Images Found: <span>${c.images}/${c.prompts}</span></p>
+                </div>
+                <div class="audit-badge ${auditClass}">${auditText}</div>
+                <div class="status-badge">${c.ready ? '🟢 Ready to Stitch' : '🟡 Missing Images'}</div>
+                
+                <div class="chunk-actions">
+                    <button class="action-btn reprompt-btn" onclick="repromptChunk('${projName}', '${c.chunk}')">🔄 Regenerate Prompts</button>
+                    <button class="action-btn stitch-chunk-btn" onclick="stitchSingleChunk('${projName}', '${c.chunk}')" ${c.ready ? '' : 'disabled'}>🎬 Stitch Chunk</button>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+        
+        if (data.total_ready) {
+            stitchBtn.disabled = false;
+            stitchBtn.classList.remove('disabled-btn');
+        } else {
+            stitchBtn.disabled = true;
+            stitchBtn.classList.add('disabled-btn');
+        }
+    } catch (e) {
+        grid.innerHTML = '<div style="color: red">Error loading details.</div>';
+    }
+}
+
+async function repromptChunk(projName, chunkId) {
+    const termContainer = document.getElementById('stitch-terminal-container');
+    const term = document.getElementById('stitch-terminal');
+    
+    termContainer.classList.remove('hidden');
+    term.innerHTML = '';
+    
+    const streamUrl = `/api/projects/${projName}/re-prompt/${chunkId}`;
+    const eventSource = new EventSource(streamUrl);
+    
+    eventSource.onmessage = function(event) {
+        if (event.data === '[DONE]') {
+            eventSource.close();
+            appendLog(term, '[SYSTEM] Regeneration Completed! Refreshing Dashboard...');
+            loadProjectDetails();
+        } else {
+            appendLog(term, event.data);
+        }
+    };
+    
+    eventSource.onerror = function(err) {
+        eventSource.close();
+        appendLog(term, '[ERROR] Connection lost during regeneration.');
+    };
+}
+
+async function stitchSingleChunk(projName, chunkId) {
+    const termContainer = document.getElementById('stitch-terminal-container');
+    const term = document.getElementById('stitch-terminal');
+    
+    termContainer.classList.remove('hidden');
+    term.innerHTML = '';
+    
+    const streamUrl = `/api/projects/${projName}/stitch/${chunkId}`;
+    const eventSource = new EventSource(streamUrl);
+    
+    eventSource.onmessage = function(event) {
+        if (event.data === '[DONE]') {
+            eventSource.close();
+            appendLog(term, '[SYSTEM] Single Chunk Stitching Completed!');
+        } else {
+            appendLog(term, event.data);
+        }
+    };
+    
+    eventSource.onerror = function(err) {
+        eventSource.close();
+        appendLog(term, '[ERROR] Connection lost during stitching.');
+    };
+}
+
+async function stitchVideo() {
+    const projName = document.getElementById('project-list').value;
+    if (!projName) return;
+    
+    const termContainer = document.getElementById('stitch-terminal-container');
+    const term = document.getElementById('stitch-terminal');
+    const btn = document.getElementById('stitch-btn');
+    const sText = document.querySelector('.stitch-btn-text');
+    const sSpin = document.getElementById('stitch-spinner');
+    
+    termContainer.classList.remove('hidden');
+    term.innerHTML = '';
+    
+    btn.disabled = true;
+    sText.classList.add('hidden');
+    sSpin.classList.remove('hidden');
+    
+    const streamUrl = `/api/projects/${projName}/stitch`;
+    const eventSource = new EventSource(streamUrl);
+    
+    eventSource.onmessage = function(event) {
+        if (event.data === '[DONE]') {
+            eventSource.close();
+            appendLog(term, '[SYSTEM] Full Stitching Completed Successfully!');
+            sText.classList.remove('hidden');
+            sSpin.classList.add('hidden');
+            btn.disabled = false;
+            sText.textContent = "Final Video Rendered!";
+        } else {
+            appendLog(term, event.data);
+        }
+    };
+    
+    eventSource.onerror = function(err) {
+        eventSource.close();
+        appendLog(term, '[ERROR] Connection lost during render.');
+        sText.classList.remove('hidden');
+        sSpin.classList.add('hidden');
+        btn.disabled = false;
+    };
+}
