@@ -2,7 +2,7 @@ import argparse
 import os
 import re
 
-def chunk_file(input_file, out_dir, max_chars=4500):
+def chunk_file(input_file, out_dir, max_chars=5000):
     with open(input_file, 'r', encoding='utf-8') as f:
         content = f.read()
         
@@ -46,7 +46,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Intelligent Text Chunker")
     parser.add_argument('--input', type=str, required=True, help='Path to the original script text file')
     parser.add_argument('--out-dir', type=str, required=True, help='Output directory for the chunks')
-    parser.add_argument('--max-chars', type=int, default=4500, help='Maximum characters per chunk (default 4500)')
+    parser.add_argument('--max-chars', type=int, default=5000, help='Maximum characters per chunk (default 5000)')
     args = parser.parse_args()
     
     chunk_file(args.input, args.out_dir, args.max_chars)

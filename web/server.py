@@ -63,8 +63,8 @@ async def stream_logs(request: Request, project_name: str, file_path: str, voice
     async def event_generator():
         yield f"data: [INFO] Starting pipeline for project: {project_name}\n\n"
         
-        yield f"data: [INFO] >>> STEP 1: Running intelligent text chunker...\n\n"
-        chunker_cmd = ["python", ".agents/skills/long-video-workflow/scripts/text_chunker.py", "--input", file_path, "--out-dir", project_name, "--max-chars", "4500"]
+        yield f"data: [INFO] >>> STEP 1: Chunking the script into ~5000-character segments...\n\n"
+        chunker_cmd = ["python", ".agents/skills/long-video-workflow/scripts/text_chunker.py", "--input", file_path, "--out-dir", project_name, "--max-chars", "5000"]
         process = await asyncio.create_subprocess_exec(*chunker_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
         
         while True:
