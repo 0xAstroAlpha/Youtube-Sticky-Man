@@ -60,12 +60,13 @@ def generate_prompts(chunk_index, transcript_path):
 
     # --- Dynamic scene count: ~70-80 chars/scene, also bounded by audio duration ---
     char_count = len(text_content)
-    target_scenes = max(10, round(char_count / 75))
-    # Guarantee at least 1 scene per MAX_SCENE_DURATION seconds of audio
-    audio_min     = max(8, round(audio_end / MAX_SCENE_DURATION))
-    min_scenes    = max(audio_min, round(char_count / 90))
-    max_scenes    = max(target_scenes + 5, round(char_count / 60))
-    print(f"[PLAN] {char_count} chars | {total_words} words | {audio_end:.1f}s audio -> target {target_scenes} scenes ({min_scenes}-{max_scenes})")
+    audio_min     = max(8, round(audio_end / MAX_SCENE_DURATION))  # floor: 1 scene per 4s of audio
+    char_target   = max(10, round(char_count / 75))                 # ~75 chars/scene
+
+    min_scenes    = max(audio_min, round(char_count / 90))          # audio constraint wins
+    target_scenes = max(char_target, min_scenes)                    # target always >= min
+    max_scenes    = max(min_scenes + 10, round(char_count / 60), round(audio_end / 2.0))  # always > min
+    print(f"[PLAN] {char_count} chars | {total_words} words | {audio_end:.1f}s audio -> target {target_scenes} scenes (min:{min_scenes} max:{max_scenes})")
 
     # --- Build compact word index for Gemini (Level 1: direct index, no text matching) ---
     word_index = build_compact_word_index(words_data)
@@ -115,15 +116,23 @@ OUTPUT — strictly valid JSON array only, no extra text:
 
     try:
         raw_resp = response.text.strip()
+        # Cleanup 1: duplicated closing bracket e.g. "]\n]"
         if raw_resp.endswith("]\n]") or raw_resp.endswith("]]"):
             raw_resp = raw_resp.rsplit(']', 1)[0].strip()
             if not raw_resp.endswith(']'):
                 raw_resp += ']'
         semantic_map = json.loads(raw_resp)
     except json.JSONDecodeError:
-        print("Error: Failed to parse Gemini response as JSON.")
-        print(response.text)
-        return
+        # Cleanup 2: stray closing brace before final ] e.g. "}\n}\n]"
+        try:
+            fixed = re.sub(r'}(\s*\n\s*)+}(\s*\n\s*)+]\s*$', '}\n]', raw_resp)
+            semantic_map = json.loads(fixed)
+            print("[WARN] Fixed stray closing brace in Gemini response.")
+        except json.JSONDecodeError:
+            print("Error: Failed to parse Gemini response as JSON.")
+            # Print first 500 chars so it doesn't flood the log
+            print(response.text[:500])
+            return
 
     print(f"Gemini returned {len(semantic_map)} scenes. Validating indices...")
 
