@@ -252,6 +252,9 @@ async function uploadImages(event, projName, chunkId) {
     event.target.previousElementSibling.textContent = "Uploading...";
     event.target.disabled = true;
     
+    const term = document.getElementById('stitch-terminal');
+    appendLog(term, `[INFO] Uploading ${files.length} images for Chunk ${chunkId}...`);
+    
     try {
         const res = await fetch(`/api/projects/${projName}/upload/${chunkId}`, {
             method: 'POST',
@@ -259,14 +262,17 @@ async function uploadImages(event, projName, chunkId) {
         });
         const data = await res.json();
         if (data.status === 'success') {
+            appendLog(term, `[SUCCESS] ${data.message}`);
             loadProjectDetails(); // refresh
         } else {
             const errorMsg = data.message || (data.detail ? JSON.stringify(data.detail) : 'Unknown backend error');
+            appendLog(term, `[ERROR] Upload failed: ${errorMsg}`);
             alert('Upload failed: ' + errorMsg);
             event.target.previousElementSibling.textContent = originalText;
             event.target.disabled = false;
         }
     } catch (e) {
+        appendLog(term, `[ERROR] Upload network error: ${e.message}`);
         alert('Upload error');
         event.target.previousElementSibling.textContent = originalText;
         event.target.disabled = false;
