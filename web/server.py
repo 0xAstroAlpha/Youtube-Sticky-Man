@@ -10,7 +10,38 @@ from fastapi import FastAPI, UploadFile, File, Form, Request
 from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+import base64
+import secrets
+from dotenv import load_dotenv
+
+load_dotenv()
+
 app = FastAPI()
+
+@app.middleware("http")
+async def basic_auth(request: Request, call_next):
+    # Allow CORS preflight requests to bypass auth if needed, but not strictly necessary here.
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Basic "):
+        try:
+            encoded_credentials = auth_header.split(" ", 1)[1]
+            decoded_credentials = base64.b64decode(encoded_credentials).decode("utf-8")
+            username, password = decoded_credentials.split(":", 1)
+            
+            correct_username = secrets.compare_digest(username, os.getenv("APP_USERNAME", "admin"))
+            correct_password = secrets.compare_digest(password, os.getenv("APP_PASSWORD", "sticky123"))
+            
+            if correct_username and correct_password:
+                return await call_next(request)
+        except Exception:
+            pass
+            
+    from fastapi import Response
+    return Response(
+        content="Unauthorized",
+        status_code=401,
+        headers={"WWW-Authenticate": 'Basic realm="Secure Area"'}
+    )
 
 app.mount("/static", StaticFiles(directory="web/static"), name="static")
 
