@@ -195,6 +195,7 @@ async function loadProjectDetails() {
                 
                 <div class="chunk-actions">
                     <button class="action-btn reprompt-btn" onclick="repromptChunk('${projName}', '${c.chunk}')">🔄 Regenerate Prompts</button>
+                    ${!c.audit_pass ? `<button class="action-btn reprompt-btn" style="background: rgba(255, 60, 60, 0.2);" onclick="surgeryChunk('${projName}', '${c.chunk}')">✂️ Fix >8s Scenes</button>` : ''}
                     <button class="action-btn stitch-chunk-btn" onclick="stitchSingleChunk('${projName}', '${c.chunk}')" ${c.ready ? '' : 'disabled'}>🎬 Stitch Chunk</button>
                 </div>
             `;
@@ -211,6 +212,32 @@ async function loadProjectDetails() {
     } catch (e) {
         grid.innerHTML = '<div style="color: red">Error loading details.</div>';
     }
+}
+
+async function surgeryChunk(projName, chunkId) {
+    const termContainer = document.getElementById('stitch-terminal-container');
+    const term = document.getElementById('stitch-terminal');
+    
+    termContainer.classList.remove('hidden');
+    term.innerHTML = '';
+    
+    const streamUrl = `/api/projects/${projName}/surgery/${chunkId}`;
+    const eventSource = new EventSource(streamUrl);
+    
+    eventSource.onmessage = function(event) {
+        if (event.data === '[DONE]') {
+            eventSource.close();
+            appendLog(term, '[SYSTEM] Surgery Completed! Refreshing Dashboard...');
+            loadProjectDetails();
+        } else {
+            appendLog(term, event.data);
+        }
+    };
+    
+    eventSource.onerror = function(err) {
+        eventSource.close();
+        appendLog(term, '[ERROR] Connection lost during surgery.');
+    };
 }
 
 async function repromptChunk(projName, chunkId) {

@@ -115,7 +115,7 @@ async def get_project_details(name: str):
             if dur > max_duration:
                 max_duration = dur
         
-        audit_pass = max_duration <= 6.0
+        audit_pass = max_duration <= 8.0
         
         images_dir = os.path.join(name, f"images_chunk_{chunk_idx}")
         images_count = 0
@@ -184,3 +184,18 @@ async def reprompt_chunk(request: Request, name: str, chunk_id: str):
         await process.wait()
         yield "data: [DONE]\n\n"
     return StreamingResponse(reprompt_generator(), media_type="text/event-stream")
+
+@app.get("/api/projects/{name}/surgery/{chunk_id}")
+async def surgery_chunk(request: Request, name: str, chunk_id: str):
+    async def surgery_generator():
+        yield f"data: [INFO] Performing MICRO-SURGERY on Chunk {chunk_id} in {name}...\n\n"
+        surgery_cmd = ["python", ".agents/skills/long-video-workflow/scripts/reprocess_long_scenes.py", "--chunk", chunk_id, "--project", name]
+        
+        process = await asyncio.create_subprocess_exec(*surgery_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+        while True:
+            line = await process.stdout.readline()
+            if not line: break
+            yield f"data: {line.decode('utf-8').strip()}\n\n"
+        await process.wait()
+        yield "data: [DONE]\n\n"
+    return StreamingResponse(surgery_generator(), media_type="text/event-stream")
