@@ -81,7 +81,7 @@ async def stream_logs(request: Request, project_name: str, file_path: str, voice
         yield f"data: [INFO] >>> PIPELINE COMPLETE! All files and folders are ready in the '{project_name}' directory.\n\n"
         yield "data: [DONE]\n\n"
         
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(event_generator(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"})
 
 
 @app.get("/api/projects")
@@ -176,7 +176,7 @@ async def stitch_project_chunk(request: Request, name: str, chunk_id: str):
             yield f"data: {line.decode('utf-8').strip()}\n\n"
         await process.wait()
         yield "data: [DONE]\n\n"
-    return StreamingResponse(stitch_generator(), media_type="text/event-stream")
+    return StreamingResponse(stitch_generator(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"})
 
 
 @app.get("/api/projects/{name}/re-prompt/{chunk_id}")
@@ -193,7 +193,7 @@ async def reprompt_chunk(request: Request, name: str, chunk_id: str):
             yield f"data: {line.decode('utf-8').strip()}\n\n"
         await process.wait()
         yield "data: [DONE]\n\n"
-    return StreamingResponse(reprompt_generator(), media_type="text/event-stream")
+    return StreamingResponse(reprompt_generator(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"})
 
 @app.get("/api/projects/{name}/surgery/{chunk_id}")
 async def surgery_chunk(request: Request, name: str, chunk_id: str):
@@ -208,7 +208,7 @@ async def surgery_chunk(request: Request, name: str, chunk_id: str):
             yield f"data: {line.decode('utf-8').strip()}\n\n"
         await process.wait()
         yield "data: [DONE]\n\n"
-    return StreamingResponse(surgery_generator(), media_type="text/event-stream")
+    return StreamingResponse(surgery_generator(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"})
 
 # --- NEW: Download & Upload APIs ---
 
