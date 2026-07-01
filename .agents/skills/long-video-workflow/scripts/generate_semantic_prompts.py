@@ -27,11 +27,11 @@ def generate_prompts(chunk_index, transcript_path):
 Your task is to break down a provided text into a chronological sequence of highly visual, impactful scenes (1-4 seconds each).
 For each scene, identify the EXACT word in the text where the cut should happen (the "target_word") and describe the visual scene ("visual").
 
-CRITICAL ANTI-LAZINESS RULES:
+CRITICAL TIMING & PACING RULES:
 1. You MUST process the ENTIRE provided text from the very first word to the very last word. Do not skip, summarize, or truncate any parts.
-2. A text of this length MUST yield between 40 to 60 scenes. You must pick a new `target_word` roughly every 10 to 20 words. The pacing must be relentless. If you return fewer than 30 scenes, you have failed.
+2. A text of this length MUST yield between 15 to 25 scenes. You must pick a new `target_word` roughly every 25 to 40 words.
 3. Target Word: Must be exactly as it appears in the text, sequentially.
-4. Visual pacing: Very fast, dynamic. Cut roughly every 1-4 seconds.
+4. Visual pacing: Steady and engaging. Do NOT cut too fast. Each scene should last between 3 to 8 seconds. Avoid making scenes less than 2 seconds.
 5. Character Lock: Use the exact literal string "[MC]" anytime you refer to the main character. Do NOT type out the full description. Example: "[MC] holding a spear".
 6. Red X Rule: Use a giant bold red X ONLY for rejected choices, forbidden objects, or wrong habits. Do not use as generic decoration.
 7. Do NOT include the base styling recipe (e.g. "Hand-drawn 2D doodle cartoon...") in your "visual" output, just describe the action/scene. We will wrap it later.
@@ -112,6 +112,10 @@ Return a strictly valid JSON array of objects, where each object has:
     if not compiled_shots:
         print("Error: Could not match any target words to the transcript.")
         return
+
+    # THE ANCHOR FIX: Force the first image to start exactly when the audio starts (0.0s).
+    # This prevents the entire timeline from shifting forward if the first target word appears late.
+    compiled_shots[0]['start'] = 0.0
 
     for i in range(len(compiled_shots)):
         if i < len(compiled_shots) - 1:
