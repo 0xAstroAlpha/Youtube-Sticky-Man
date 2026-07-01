@@ -50,31 +50,25 @@ def stitch_project(project_dir, specific_chunk=None):
         image_files = sorted(glob.glob(os.path.join(images_dir, "*.*")))
         image_files = [img for img in image_files if img.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]
         
-        actual_images = []
+        if len(image_files) < len(prompts):
+            print(f"[ERROR] Chunk {c}: Found {len(image_files)} images, but need {len(prompts)}. Aborting.")
+            return
+            
+        # Get exactly the number of images we need, sorted in ascending order
+        actual_images = image_files[:len(prompts)]
         json_updated = False
         
         for i, p in enumerate(prompts):
-            prefix = f"{(i+1):03d}"
-            # Support both new 001 and legacy 0001
-            legacy_prefix = f"{(i+1):04d}"
+            chosen_img = actual_images[i]
             
-            matched = [img for img in image_files if os.path.basename(img).startswith(prefix) or os.path.basename(img).startswith(legacy_prefix)]
-            
-            if not matched:
-                print(f"[ERROR] Chunk {c}: Missing image starting with {prefix} (or {legacy_prefix}) for shot {i+1}. Aborting.")
-                return
-            
-            chosen_img = matched[0]
-            actual_images.append(chosen_img)
-            
-            # Update the JSON so Kdenlive reads the correct file name with suffix
+            # Update the JSON so Kdenlive reads the correct exact file name (e.g. 141_xyz.png)
             actual_filename = os.path.basename(chosen_img)
             if 'output' in p and p['output'].get('file') != actual_filename:
                 p['output']['file'] = actual_filename
                 json_updated = True
                 
         if json_updated:
-            print(f"[INFO] Updating {json_path} to sync filenames with suffixes...")
+            print(f"[INFO] Updating {json_path} to sync filenames (Flexible Numbering)...")
             with open(json_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2)
             
