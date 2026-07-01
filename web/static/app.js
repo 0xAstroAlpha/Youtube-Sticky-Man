@@ -216,10 +216,15 @@ async function loadProjectDetails() {
         
         data.chunks.forEach(c => {
             const card = document.createElement('div');
-            card.className = `chunk-card ${c.ready ? 'ready' : 'waiting'}`;
+            card.className = `chunk-card ${c.error ? 'error' : (c.ready ? 'ready' : 'waiting')}`;
             
             const auditClass = c.audit_pass ? 'audit-pass' : 'audit-fail';
             const auditText = c.audit_pass ? `✅ Max pause: ${c.max_duration}s` : `⚠️ Long pause: ${c.max_duration}s`;
+            
+            let statusBadge;
+            if (c.error) statusBadge = '❌ Prompt Failed';
+            else if (c.ready) statusBadge = '🟢 Ready to Stitch';
+            else statusBadge = '🟡 Missing Images';
             
             card.innerHTML = `
                 <h3>Chunk ${c.chunk}</h3>
@@ -228,7 +233,7 @@ async function loadProjectDetails() {
                     <p>Images Found: <span>${c.images}/${c.prompts}</span></p>
                 </div>
                 <div class="audit-badge ${auditClass}">${auditText}</div>
-                <div class="status-badge">${c.ready ? '🟢 Ready to Stitch' : '🟡 Missing Images'}</div>
+                <div class="status-badge" style="${c.error ? 'background: rgba(255, 0, 0, 0.2); color: #ff6b6b;' : ''}">${statusBadge}</div>
                 
                 <div style="margin: 10px 0; display:flex; gap:5px; flex-wrap:wrap;">
                     <a href="/api/projects/${projName}/download/prompts?pwd=${encodeURIComponent(appPwd || '')}" class="action-btn" style="flex:1; text-align:center; font-size:0.8rem; text-decoration:none;">⬇️ Prompts</a>

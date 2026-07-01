@@ -512,3 +512,6 @@ input[type="text"]:focus {
         top: 2rem;
     }
 }
+
+.chunk-card.error { border-color: rgba(255, 60, 60, 0.5); }
+.chunk-card.error h3 { color: #ff6b6b; }

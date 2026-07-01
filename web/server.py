@@ -126,45 +126,81 @@ async def get_project_details(name: str):
     if not os.path.exists(name):
         return {"status": "error", "message": "Project not found"}
         
-    jsons = glob.glob(os.path.join(name, "image_prompts_chunk_*.json"))
+    txt_files = glob.glob(os.path.join(name, "chunk_*.txt"))
     chunks_data = []
     total_ready = True
     
-    for jf in sorted(jsons):
-        basename = os.path.basename(jf)
-        chunk_idx = basename.replace("image_prompts_chunk_", "").replace(".json", "")
+    # Sort numerically based on chunk index
+    def get_chunk_idx(filepath):
+        basename = os.path.basename(filepath)
+        idx_str = basename.replace("chunk_", "").replace(".txt", "")
+        return int(idx_str) if idx_str.isdigit() else 0
         
+    for txt in sorted(txt_files, key=get_chunk_idx):
+        chunk_idx = str(get_chunk_idx(txt))
+        jf = os.path.join(name, f"image_prompts_chunk_{chunk_idx}.json")
+        
+        if not os.path.exists(jf):
+            chunks_data.append({
+                "chunk": chunk_idx,
+                "prompts": 0,
+                "images": 0,
+                "ready": False,
+                "audit_pass": False,
+                "max_duration": 0,
+                "error": True
+            })
+            total_ready = False
+            continue
+            
         with open(jf, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        
+            try:
+                data = json.load(f)
+            except json.JSONDecodeError:
+                # Handle corrupted json
+                chunks_data.append({
+                    "chunk": chunk_idx,
+                    "prompts": 0,
+                    "images": 0,
+                    "ready": False,
+                    "audit_pass": False,
+                    "max_duration": 0,
+                    "error": True
+                })
+                total_ready = False
+                continue
+                
         prompts = data.get("prompts", [])
-        prompts_count = len(prompts)
-        
-        max_duration = 0.0
-        for p in prompts:
-            dur = float(p['timing']['end']) - float(p['timing']['start'])
-            if dur > max_duration:
-                max_duration = dur
-        
-        audit_pass = max_duration <= 8.0
-        
+        num_prompts = len(prompts)
         images_dir = os.path.join(name, f"images_chunk_{chunk_idx}")
         images_count = 0
         if os.path.exists(images_dir):
-            image_files = [img for img in os.listdir(images_dir) if img.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]
-            images_count = len(image_files)
+            images_count = len([f for f in os.listdir(images_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))])
             
-        ready = images_count >= prompts_count
+        ready = (images_count >= num_prompts) and (num_prompts > 0)
         if not ready:
             total_ready = False
             
+        # Pacing Audit
+        max_duration = 0.0
+        for p in prompts:
+            try:
+                dur = float(p['timing']['end']) - float(p['timing']['start'])
+            except (KeyError, TypeError, ValueError):
+                dur = 0.0
+            if dur > max_duration:
+                max_duration = dur
+                
+        audit_pass = max_duration <= 8.0
+            
         chunks_data.append({
             "chunk": chunk_idx,
-            "prompts": prompts_count,
+            "prompts": num_prompts,
             "images": images_count,
             "ready": ready,
             "audit_pass": audit_pass,
-            "max_duration": round(max_duration, 2)
+            "max_duration": round(max_duration, 2),
+            "error": False
         })
         
     # Check if final video exists
