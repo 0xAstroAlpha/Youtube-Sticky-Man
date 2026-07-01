@@ -46,7 +46,7 @@ def generate_prompts(chunk_index, transcript_path):
         print("Error: GEMINI_API_KEY not found in .env")
         return
 
-    model_id = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-preview")
+    model_id = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
     print(f"[MODEL] Using {model_id}")
 
     with open(transcript_path, 'r', encoding='utf-8') as f:

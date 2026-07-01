@@ -54,7 +54,7 @@ def reprocess_surgery(chunk_index, project_dir):
         print("Error: GEMINI_API_KEY not found in .env")
         return
 
-    model_id = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-preview")
+    model_id = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
     print(f"[MODEL] Using {model_id} for surgery batch")
 
     client = genai.Client(api_key=api_key)
