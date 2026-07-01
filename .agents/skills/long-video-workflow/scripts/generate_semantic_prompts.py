@@ -35,6 +35,8 @@ CRITICAL TIMING & PACING RULES:
 5. Character Lock: Use the exact literal string "[MC]" anytime you refer to the main character. Do NOT type out the full description. Example: "[MC] holding a spear".
 6. Red X Rule: Use a giant bold red X ONLY for rejected choices, forbidden objects, or wrong habits. Do not use as generic decoration.
 7. Do NOT include the base styling recipe (e.g. "Hand-drawn 2D doodle cartoon...") in your "visual" output, just describe the action/scene. We will wrap it later.
+8. Enumeration/List Rule: For sentences that contain a list of items or concepts, you MUST split EACH item in the list into its own separate scene to increase visual dynamism.
+9. Contextual Splitting: Always split scenes based on the sentence's logical context, choosing the most impactful keyword as the `target_word` so the visual hits exactly when the keyword is spoken.
 
 OUTPUT FORMAT:
 Return a strictly valid JSON array of objects, where each object has:
