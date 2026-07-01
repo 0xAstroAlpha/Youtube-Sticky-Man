@@ -31,7 +31,7 @@ CRITICAL TIMING & PACING RULES:
 1. You MUST process the ENTIRE provided text from the very first word to the very last word. Do not skip, summarize, or truncate any parts.
 2. A text of this length MUST yield between 20 to 40 scenes. You must pick a new `target_word` roughly every 15 to 30 words.
 3. Target Word: Must be exactly as it appears in the text, sequentially.
-4. Visual pacing: Steady and engaging. Each scene should last between 2 to 5 seconds. Avoid making scenes less than 2 seconds or longer than 5 seconds.
+4. Visual pacing: Steady and engaging. Each scene should last between 1 to 4 seconds. Avoid making scenes less than 1 second or longer than 4 seconds.
 5. Character Lock: Use the exact literal string "[MC]" anytime you refer to the main character. Do NOT type out the full description. Example: "[MC] holding a spear".
 6. Red X Rule: Use a giant bold red X ONLY for rejected choices, forbidden objects, or wrong habits. Do not use as generic decoration.
 7. Do NOT include the base styling recipe (e.g. "Hand-drawn 2D doodle cartoon...") in your "visual" output, just describe the action/scene. We will wrap it later.

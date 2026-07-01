@@ -38,13 +38,13 @@ def reprocess_surgery(chunk_index, project_dir):
     
     sys_instruction = """You are an expert director performing micro-surgery on an educational YouTube doodle animation channel.
 The user provided a segment of text that belongs to a single scene which is currently TOO LONG.
-Your task is to break down this segment into 2 or 3 smaller, highly visual, impactful scenes (2-5 seconds each).
+Your task is to break down this segment into 2 or 3 smaller, highly visual, impactful scenes (1-4 seconds each).
 For each scene, identify the EXACT word in the text where the cut should happen (the "target_word") and describe the visual scene ("visual").
 
 CRITICAL TIMING & PACING RULES:
 1. You MUST process the ENTIRE provided text from the very first word to the very last word. Do not skip, summarize, or truncate any parts.
 2. Target Word: Must be exactly as it appears in the text, sequentially.
-3. Visual pacing: Each scene should last between 2 to 5 seconds.
+3. Visual pacing: Each scene should last between 1 to 4 seconds.
 4. Character Lock: Use the exact literal string "[MC]" anytime you refer to the main character.
 5. Red X Rule: Use a giant bold red X ONLY for rejected choices, forbidden objects, or wrong habits.
 6. Do NOT include the base styling recipe (e.g. "Hand-drawn 2D doodle cartoon...") in your "visual" output.
