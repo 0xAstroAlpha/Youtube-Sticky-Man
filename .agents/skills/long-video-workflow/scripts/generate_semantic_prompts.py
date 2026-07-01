@@ -29,9 +29,9 @@ For each scene, identify the EXACT word in the text where the cut should happen 
 
 CRITICAL TIMING & PACING RULES:
 1. You MUST process the ENTIRE provided text from the very first word to the very last word. Do not skip, summarize, or truncate any parts.
-2. A text of this length MUST yield between 15 to 25 scenes. You must pick a new `target_word` roughly every 25 to 40 words.
+2. A text of this length MUST yield between 20 to 40 scenes. You must pick a new `target_word` roughly every 15 to 30 words.
 3. Target Word: Must be exactly as it appears in the text, sequentially.
-4. Visual pacing: Steady and engaging. Do NOT cut too fast. Each scene should last between 3 to 8 seconds. Avoid making scenes less than 2 seconds.
+4. Visual pacing: Steady and engaging. Each scene should last between 2 to 5 seconds. Avoid making scenes less than 2 seconds or longer than 5 seconds.
 5. Character Lock: Use the exact literal string "[MC]" anytime you refer to the main character. Do NOT type out the full description. Example: "[MC] holding a spear".
 6. Red X Rule: Use a giant bold red X ONLY for rejected choices, forbidden objects, or wrong habits. Do not use as generic decoration.
 7. Do NOT include the base styling recipe (e.g. "Hand-drawn 2D doodle cartoon...") in your "visual" output, just describe the action/scene. We will wrap it later.
@@ -114,8 +114,14 @@ Return a strictly valid JSON array of objects, where each object has:
         return
 
     # THE ANCHOR FIX: Force the first image to start exactly when the audio starts (0.0s).
-    # This prevents the entire timeline from shifting forward if the first target word appears late.
     compiled_shots[0]['start'] = 0.0
+    
+    # THE PREEMPT FIX (Video Editor Technique):
+    # Cut the visual 100ms (0.1s) BEFORE the target word is spoken. 
+    # This compensates for human visual/auditory processing lag, making cuts feel perfectly in-sync.
+    PREEMPT_OFFSET = 0.1
+    for i in range(1, len(compiled_shots)):
+        compiled_shots[i]['start'] = max(0.0, compiled_shots[i]['start'] - PREEMPT_OFFSET)
 
     for i in range(len(compiled_shots)):
         if i < len(compiled_shots) - 1:
