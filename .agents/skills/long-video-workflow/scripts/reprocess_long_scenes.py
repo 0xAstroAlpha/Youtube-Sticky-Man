@@ -54,6 +54,9 @@ def reprocess_surgery(chunk_index, project_dir):
         print("Error: GEMINI_API_KEY not found in .env")
         return
 
+    model_id = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-preview")
+    print(f"[MODEL] Using {model_id} for surgery batch")
+
     client = genai.Client(api_key=api_key)
 
     transcript_path  = os.path.join(project_dir, f"transcript_chunk_{chunk_index}.json")
@@ -158,7 +161,7 @@ OUTPUT — strictly valid JSON array, one object per input segment:
 ]"""
 
     response = client.models.generate_content(
-        model='gemini-3.1-pro-preview',
+        model=model_id,
         contents=batch_input_json,
         config=types.GenerateContentConfig(
             system_instruction=sys_instruction,

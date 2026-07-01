@@ -46,6 +46,9 @@ def generate_prompts(chunk_index, transcript_path):
         print("Error: GEMINI_API_KEY not found in .env")
         return
 
+    model_id = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-preview")
+    print(f"[MODEL] Using {model_id}")
+
     with open(transcript_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
@@ -92,9 +95,9 @@ OUTPUT — strictly valid JSON array only, no extra text:
   {{"wi": 4, "visual": "next scene", "cont": true}}
 ]"""
 
-    print("Calling Gemini API (single pass — direct word-index mode)...")
+    print("Calling Gemini API (single pass -- direct word-index mode)...")
     response = client.models.generate_content(
-        model='gemini-3.1-pro-preview',
+        model=model_id,
         contents=word_index_json,
         config=types.GenerateContentConfig(
             system_instruction=sys_instruction,
