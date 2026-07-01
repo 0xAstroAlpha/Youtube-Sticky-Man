@@ -20,28 +20,24 @@ app = FastAPI()
 
 @app.middleware("http")
 async def basic_auth(request: Request, call_next):
-    # Allow CORS preflight requests to bypass auth if needed, but not strictly necessary here.
-    auth_header = request.headers.get("Authorization")
-    if auth_header and auth_header.startswith("Basic "):
-        try:
-            encoded_credentials = auth_header.split(" ", 1)[1]
-            decoded_credentials = base64.b64decode(encoded_credentials).decode("utf-8")
-            username, password = decoded_credentials.split(":", 1)
-            
-            correct_username = secrets.compare_digest(username, os.getenv("APP_USERNAME", "admin"))
-            correct_password = secrets.compare_digest(password, os.getenv("APP_PASSWORD", "sticky123"))
-            
-            if correct_username and correct_password:
-                return await call_next(request)
-        except Exception:
-            pass
+    # Only protect API endpoints
+    if not request.url.path.startswith("/api"):
+        return await call_next(request)
+
+    correct_password = os.getenv("APP_PASSWORD", "sticky123")
+    
+    # Check header
+    auth_header = request.headers.get("X-App-Password")
+    if auth_header and secrets.compare_digest(auth_header, correct_password):
+        return await call_next(request)
+        
+    # Check query param (for EventSource, Download links, Video etc)
+    pwd_query = request.query_params.get("pwd")
+    if pwd_query and secrets.compare_digest(pwd_query, correct_password):
+        return await call_next(request)
             
     from fastapi import Response
-    return Response(
-        content="Unauthorized",
-        status_code=401,
-        headers={"WWW-Authenticate": 'Basic realm="Secure Area"'}
-    )
+    return Response(content="Unauthorized", status_code=401)
 
 app.mount("/static", StaticFiles(directory="web/static"), name="static")
 

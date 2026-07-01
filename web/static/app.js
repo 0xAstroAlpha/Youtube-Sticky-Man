@@ -1,6 +1,30 @@
 const dropArea = document.getElementById('drop-area');
 const fileInput = document.getElementById('script-file');
 const fileMessage = document.querySelector('.file-message');
+// Custom Auth Logic
+let appPwd = localStorage.getItem('app_pwd');
+if (!appPwd) {
+    appPwd = prompt("Enter App Password:");
+    if (appPwd) {
+        localStorage.setItem('app_pwd', appPwd);
+    }
+}
+
+const originalFetch = window.fetch;
+window.fetch = async function() {
+    let [resource, config] = arguments;
+    if (!config) config = {};
+    if (!config.headers) config.headers = {};
+    config.headers['X-App-Password'] = appPwd || '';
+    
+    let res = await originalFetch(resource, config);
+    if (res.status === 401) {
+        localStorage.removeItem('app_pwd');
+        alert("Invalid Password. Please refresh to try again.");
+    }
+    return res;
+};
+
 const form = document.getElementById('upload-form');
 const generateBtn = document.getElementById('generate-btn');
 const btnText = document.querySelector('.btn-text');
@@ -96,7 +120,7 @@ form.addEventListener('submit', async (e) => {
         if (data.status === 'success') {
             appendLog(terminal, `[SYSTEM] Script uploaded successfully. Initializing workspace: ${data.project_name}`);
 
-            const streamUrl = `/api/stream?project_name=${encodeURIComponent(data.project_name)}&file_path=${encodeURIComponent(data.file_path)}&voice_id=${encodeURIComponent(data.voice_id)}&model_id=${encodeURIComponent(data.model_id)}`;
+            const streamUrl = `/api/stream?project_name=${encodeURIComponent(data.project_name)}&file_path=${encodeURIComponent(data.file_path)}&voice_id=${encodeURIComponent(data.voice_id)}&model_id=${encodeURIComponent(data.model_id)}&pwd=${encodeURIComponent(appPwd || '')}`;
             const eventSource = new EventSource(streamUrl);
             
             eventSource.onmessage = function(event) {
@@ -185,7 +209,7 @@ async function loadProjectDetails() {
             vidCard.style.textAlign = 'center';
             vidCard.innerHTML = `
                 <h3>🎉 Video Ready!</h3>
-                <a href="/api/projects/${projName}/download/video" class="action-btn" style="display:inline-block; margin-top:10px; background:#00f2fe; color:#000; text-decoration:none;">⬇️ Download Final Video</a>
+                <a href="/api/projects/${projName}/download/video?pwd=${encodeURIComponent(appPwd || '')}" class="action-btn" style="display:inline-block; margin-top:10px; background:#00f2fe; color:#000; text-decoration:none;">⬇️ Download Final Video</a>
             `;
             grid.appendChild(vidCard);
         }
@@ -207,8 +231,8 @@ async function loadProjectDetails() {
                 <div class="status-badge">${c.ready ? '🟢 Ready to Stitch' : '🟡 Missing Images'}</div>
                 
                 <div style="margin: 10px 0; display:flex; gap:5px; flex-wrap:wrap;">
-                    <a href="/api/projects/${projName}/download/prompts" class="action-btn" style="flex:1; text-align:center; font-size:0.8rem; text-decoration:none;">⬇️ Prompts</a>
-                    <a href="/api/projects/${projName}/download/audio" class="action-btn" style="flex:1; text-align:center; font-size:0.8rem; text-decoration:none;">⬇️ Audio</a>
+                    <a href="/api/projects/${projName}/download/prompts?pwd=${encodeURIComponent(appPwd || '')}" class="action-btn" style="flex:1; text-align:center; font-size:0.8rem; text-decoration:none;">⬇️ Prompts</a>
+                    <a href="/api/projects/${projName}/download/audio?pwd=${encodeURIComponent(appPwd || '')}" class="action-btn" style="flex:1; text-align:center; font-size:0.8rem; text-decoration:none;">⬇️ Audio</a>
                 </div>
 
                 ${!c.ready ? `
@@ -286,7 +310,7 @@ async function surgeryChunk(projName, chunkId) {
     termContainer.classList.remove('hidden');
     term.innerHTML = '';
     
-    const streamUrl = `/api/projects/${projName}/surgery/${chunkId}`;
+    const streamUrl = `/api/projects/${projName}/surgery/${chunkId}?pwd=${encodeURIComponent(appPwd || '')}`;
     const eventSource = new EventSource(streamUrl);
     
     eventSource.onmessage = function(event) {
@@ -312,7 +336,7 @@ async function repromptChunk(projName, chunkId) {
     termContainer.classList.remove('hidden');
     term.innerHTML = '';
     
-    const streamUrl = `/api/projects/${projName}/re-prompt/${chunkId}`;
+    const streamUrl = `/api/projects/${projName}/re-prompt/${chunkId}?pwd=${encodeURIComponent(appPwd || '')}`;
     const eventSource = new EventSource(streamUrl);
     
     eventSource.onmessage = function(event) {
@@ -338,7 +362,7 @@ async function stitchSingleChunk(projName, chunkId) {
     termContainer.classList.remove('hidden');
     term.innerHTML = '';
     
-    const streamUrl = `/api/projects/${projName}/stitch/${chunkId}`;
+    const streamUrl = `/api/projects/${projName}/stitch/${chunkId}?pwd=${encodeURIComponent(appPwd || '')}`;
     const eventSource = new EventSource(streamUrl);
     
     eventSource.onmessage = function(event) {
@@ -373,7 +397,7 @@ async function stitchVideo() {
     sText.classList.add('hidden');
     sSpin.classList.remove('hidden');
     
-    const streamUrl = `/api/projects/${projName}/stitch`;
+    const streamUrl = `/api/projects/${projName}/stitch?pwd=${encodeURIComponent(appPwd || '')}`;
     const eventSource = new EventSource(streamUrl);
     
     eventSource.onmessage = function(event) {
