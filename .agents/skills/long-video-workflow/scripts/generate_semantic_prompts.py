@@ -21,7 +21,8 @@ BASE_TEMPLATE = (
 )
 MAIN_CHARACTER_DESC = "a primitive prehistoric male stick figure wearing animal skins"
 PREEMPT_OFFSET = 0.1       # seconds — cut visual slightly before word is spoken
-LONG_SCENE_THRESHOLD = 8.0  # seconds
+LONG_SCENE_THRESHOLD = 8.0   # seconds — threshold for Surgery warnings
+MAX_SCENE_DURATION   = 4.0   # seconds — hard cap; auto-fill kicks in above this
 COVERAGE_GAP_THRESHOLD = 2.0  # seconds — min uncovered end gap before inserting fill
 
 
@@ -49,11 +50,13 @@ def generate_prompts(chunk_index, transcript_path):
     total_words = len(words_data)
     audio_end = words_data[-1]['end']
 
-    # --- Dynamic scene count: ~70-80 chars/scene ---
+    # --- Dynamic scene count: ~70-80 chars/scene, also bounded by audio duration ---
     char_count = len(text_content)
     target_scenes = max(10, round(char_count / 75))
-    min_scenes = max(8, round(char_count / 90))
-    max_scenes = max(target_scenes + 5, round(char_count / 60))
+    # Guarantee at least 1 scene per MAX_SCENE_DURATION seconds of audio
+    audio_min     = max(8, round(audio_end / MAX_SCENE_DURATION))
+    min_scenes    = max(audio_min, round(char_count / 90))
+    max_scenes    = max(target_scenes + 5, round(char_count / 60))
     print(f"[PLAN] {char_count} chars | {total_words} words | {audio_end:.1f}s audio → target {target_scenes} scenes ({min_scenes}–{max_scenes})")
 
     # --- Build compact word index for Gemini (Level 1: direct index, no text matching) ---
@@ -71,11 +74,12 @@ CRITICAL RULES:
 1. Cover ALL words from index 0 to {total_words - 1}. Every moment of audio must map to a visual.
 2. Output between {min_scenes} and {max_scenes} scenes (target: {target_scenes}). Aim for a new cut roughly every 3–5 words.
 3. wi values MUST be strictly ascending integers. No duplicates. Valid range: 0 to {total_words - 1}.
-4. Character Lock: Use exact string "[MC]" for the main character. Example: "[MC] looking surprised".
-5. Red X Rule: Use a giant bold red X ONLY for rejected/forbidden concepts. Not as decoration.
-6. Do NOT include styling boilerplate (e.g. "Hand-drawn 2D doodle...") in "visual". Only describe the scene/action.
-7. Enumeration Rule: Each item in a list MUST become its own separate scene.
-8. cont (boolean): true = this scene directly continues the same visual action from the previous one (same location, same character doing related action). false = new concept or setting.
+4. TIMING HARD CAP — MOST IMPORTANT: The input gives you exact start_seconds for every word. Look at consecutive wi choices you plan to make. If the time gap between two consecutive wi entries would exceed {MAX_SCENE_DURATION} seconds, you MUST insert at least one extra cut in between. No scene may last longer than {MAX_SCENE_DURATION} seconds.
+5. Character Lock: Use exact string "[MC]" for the main character. Example: "[MC] looking surprised".
+6. Red X Rule: Use a giant bold red X ONLY for rejected/forbidden concepts. Not as decoration.
+7. Do NOT include styling boilerplate (e.g. "Hand-drawn 2D doodle...") in "visual". Only describe the scene/action.
+8. Enumeration Rule: Each item in a list MUST become its own separate scene.
+9. cont (boolean): true = this scene directly continues the same visual action from the previous one (same location, same character doing related action). false = new concept or setting.
 
 OUTPUT — strictly valid JSON array only, no extra text:
 [
@@ -156,7 +160,47 @@ OUTPUT — strictly valid JSON array only, no extra text:
     for i in range(1, len(compiled_shots)):
         compiled_shots[i]['start'] = max(0.0, compiled_shots[i]['start'] - PREEMPT_OFFSET)
 
-    # Compute end / duration for each shot
+    # --- AUTO-FILL: inject midpoint cuts for any gap > MAX_SCENE_DURATION (pure Python, zero API cost) ---
+    auto_fills = 0
+    i = 0
+    while i < len(compiled_shots) - 1:
+        curr_start = compiled_shots[i]['start']
+        next_start = compiled_shots[i + 1]['start']
+        gap = next_start - curr_start
+
+        if gap > MAX_SCENE_DURATION:
+            mid_time = curr_start + gap / 2
+            curr_wi  = compiled_shots[i].get('wi', 0)
+            next_wi  = compiled_shots[i + 1].get('wi', total_words)
+
+            # Find the word closest to mid_time within the gap window
+            best_wi, best_dist = None, float('inf')
+            for scan_wi in range(curr_wi + 1, next_wi):
+                dist = abs(words_data[scan_wi]['start'] - mid_time)
+                if dist < best_dist:
+                    best_dist, best_wi = dist, scan_wi
+
+            if best_wi is not None:
+                fill_start = max(0.0, words_data[best_wi]['start'] - PREEMPT_OFFSET)
+                fill_shot = {
+                    "wi":     best_wi,
+                    "visual": compiled_shots[i]['visual'],   # extend previous visual
+                    "cont":   True,
+                    "start":  fill_start,
+                }
+                compiled_shots.insert(i + 1, fill_shot)
+                auto_fills += 1
+                print(f"[AUTO-FILL] Gap {gap:.2f}s between scenes {i+1}↔{i+2} → inserted fill at wi={best_wi} ({fill_start:.2f}s)")
+                # Do NOT increment i; re-check the new (possibly still large) first half
+            else:
+                i += 1  # no word found in gap (shouldn't happen), move on
+        else:
+            i += 1
+
+    if auto_fills:
+        print(f"[AUTO-FILL] Total: {auto_fills} fill scene(s) injected. New total: {len(compiled_shots)} scenes.")
+
+    # Compute end / duration for each shot (after auto-fill)
     for i, shot in enumerate(compiled_shots):
         if i < len(compiled_shots) - 1:
             end = compiled_shots[i + 1]['start']
