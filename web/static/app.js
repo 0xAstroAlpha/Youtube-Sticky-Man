@@ -95,15 +95,8 @@ form.addEventListener('submit', async (e) => {
         
         if (data.status === 'success') {
             appendLog(terminal, `[SYSTEM] Script uploaded successfully. Initializing workspace: ${data.project_name}`);
-            
-            // Save project to LocalStorage
-            let savedProjects = JSON.parse(localStorage.getItem('sticky_projects') || '[]');
-            if (!savedProjects.includes(data.project_id)) {
-                savedProjects.push(data.project_id);
-                localStorage.setItem('sticky_projects', JSON.stringify(savedProjects));
-            }
 
-            const streamUrl = `/api/stream?project_id=${encodeURIComponent(data.project_id)}&file_path=${encodeURIComponent(data.file_path)}&voice_id=${encodeURIComponent(data.voice_id)}&model_id=${encodeURIComponent(data.model_id)}`;
+            const streamUrl = `/api/stream?project_name=${encodeURIComponent(data.project_name)}&file_path=${encodeURIComponent(data.file_path)}&voice_id=${encodeURIComponent(data.voice_id)}&model_id=${encodeURIComponent(data.model_id)}`;
             const eventSource = new EventSource(streamUrl);
             
             eventSource.onmessage = function(event) {
@@ -148,25 +141,14 @@ async function fetchProjects() {
     selector.innerHTML = '<option value="">Loading...</option>';
     
     try {
-        let savedProjects = JSON.parse(localStorage.getItem('sticky_projects') || '[]');
-        if (savedProjects.length === 0) {
-            selector.innerHTML = '<option value="">-- No projects found --</option>';
-            document.getElementById('project-details').classList.add('hidden');
-            return;
-        }
-
-        const res = await fetch('/api/projects/list', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ projects: savedProjects })
-        });
+        const res = await fetch('/api/projects');
         const data = await res.json();
         
         selector.innerHTML = '<option value="">-- Select a project --</option>';
         data.projects.forEach(p => {
             const opt = document.createElement('option');
-            opt.value = p.id;
-            opt.textContent = p.name;
+            opt.value = p;
+            opt.textContent = p.toUpperCase();
             selector.appendChild(opt);
         });
         document.getElementById('project-details').classList.add('hidden');
