@@ -65,7 +65,8 @@ def generate_prompts(chunk_index, transcript_path):
 
     min_scenes    = max(audio_min, round(char_count / 90))          # audio constraint wins
     target_scenes = max(char_target, min_scenes)                    # target always >= min
-    max_scenes    = max(min_scenes + 10, round(char_count / 60), round(audio_end / 2.0))  # always > min
+    # max: min + 25% headroom, also at least char-based max, capped at 3s/scene (not 2s)
+    max_scenes    = max(min_scenes + 10, round(char_count / 60), round(audio_end / 3.0))
     print(f"[PLAN] {char_count} chars | {total_words} words | {audio_end:.1f}s audio -> target {target_scenes} scenes (min:{min_scenes} max:{max_scenes})")
 
     # --- Build compact word index for Gemini (Level 1: direct index, no text matching) ---
@@ -97,22 +98,35 @@ OUTPUT — strictly valid JSON array only, no extra text:
 ]"""
 
     print("Calling Gemini API (single pass -- direct word-index mode)...")
-    response = client.models.generate_content(
-        model=model_id,
-        contents=word_index_json,
-        config=types.GenerateContentConfig(
-            system_instruction=sys_instruction,
-            response_mime_type="application/json",
-            max_output_tokens=32768,
-            temperature=1.0,
-            safety_settings=[
-                types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,       threshold=types.HarmBlockThreshold.BLOCK_NONE),
-                types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HARASSMENT,         threshold=types.HarmBlockThreshold.BLOCK_NONE),
-                types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,  threshold=types.HarmBlockThreshold.BLOCK_NONE),
-                types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,  threshold=types.HarmBlockThreshold.BLOCK_NONE),
-            ]
+    try:
+        response = client.models.generate_content(
+            model=model_id,
+            contents=word_index_json,
+            config=types.GenerateContentConfig(
+                system_instruction=sys_instruction,
+                response_mime_type="application/json",
+                max_output_tokens=32768,
+                temperature=1.0,
+                safety_settings=[
+                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,       threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HARASSMENT,         threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,  threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,  threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                ]
+            )
         )
-    )
+    except Exception as e:
+        err = str(e)
+        if '404' in err or 'NOT_FOUND' in err:
+            print(f"[ERROR] Model '{model_id}' not found or not available.")
+            print("[HINT] Set GEMINI_MODEL in your .env to one of:")
+            print("  gemini-2.0-flash          (recommended, fast & cheap)")
+            print("  gemini-2.5-flash-preview-05-20")
+            print("  gemini-1.5-flash")
+            print("  gemini-1.5-pro")
+        else:
+            print(f"[ERROR] Gemini API error: {err[:300]}")
+        return
 
     try:
         raw_resp = response.text.strip()
