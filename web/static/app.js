@@ -261,7 +261,8 @@ async function uploadImages(event, projName, chunkId) {
         if (data.status === 'success') {
             loadProjectDetails(); // refresh
         } else {
-            alert('Upload failed: ' + data.message);
+            const errorMsg = data.message || (data.detail ? JSON.stringify(data.detail) : 'Unknown backend error');
+            alert('Upload failed: ' + errorMsg);
             event.target.previousElementSibling.textContent = originalText;
             event.target.disabled = false;
         }

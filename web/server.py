@@ -5,6 +5,7 @@ import glob
 import shutil
 import zipfile
 from io import BytesIO
+from typing import List
 from fastapi import FastAPI, UploadFile, File, Form, Request
 from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -236,7 +237,7 @@ async def download_prompts(name: str):
     return StreamingResponse(buf, media_type="application/zip", headers={"Content-Disposition": f"attachment; filename={name}_prompts.zip"})
 
 @app.post("/api/projects/{name}/upload/{chunk_id}")
-async def upload_images(name: str, chunk_id: str, files: list[UploadFile] = File(...)):
+async def upload_images(name: str, chunk_id: str, files: List[UploadFile] = File(...)):
     if not os.path.exists(name): return JSONResponse(status_code=404, content={"message": "Project not found"})
     
     images_dir = os.path.join(name, f"images_chunk_{chunk_id}")
