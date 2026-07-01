@@ -51,7 +51,7 @@
                 </button>
             </form>
             
-            <div class="terminal-container hidden" id="terminal-container">
+            <div class="terminal-container" id="terminal-container">
                 <div class="terminal-header">
                     <div class="dots">
                         <span class="dot red"></span>
@@ -60,31 +60,38 @@
                     </div>
                     <span class="terminal-title">System Logs</span>
                 </div>
-                <div class="terminal-body" id="terminal"></div>
+                <div class="terminal-body" id="terminal">
+                    <p class="info">[SYSTEM] Auto-Sticky-Man Studio initialized.</p>
+                    <p>[LOG] Ready. Awaiting script file upload...</p>
+                </div>
             </div>
         </main>
 
         <!-- MANAGE PROJECTS TAB -->
         <main class="glass-panel tab-content hidden" id="manage-tab">
-            <div class="project-selector">
-                <label for="project-list">Select Project:</label>
-                <select id="project-list" onchange="loadProjectDetails()"></select>
-                <button class="refresh-btn" onclick="fetchProjects()">Refresh</button>
-            </div>
-            
             <div class="manage-flex-wrapper" id="manage-flex-wrapper">
-                <div id="project-details" class="hidden" style="flex: 1;">
-                    <div class="chunks-grid" id="chunks-grid">
-                        <!-- Cards will be injected here -->
+                <!-- LEFT COLUMN: CONTROLS -->
+                <div class="control-panel">
+                    <div class="project-selector">
+                        <label for="project-list">Select Project:</label>
+                        <select id="project-list" onchange="loadProjectDetails()"></select>
+                        <button class="refresh-btn" onclick="fetchProjects()">Refresh</button>
                     </div>
                     
-                    <button id="stitch-btn" class="glow-on-hover disabled-btn" disabled onclick="stitchVideo()">
-                        <span class="stitch-btn-text">Stitch Final Video</span>
-                        <div class="spinner hidden" id="stitch-spinner"></div>
-                    </button>
+                    <div id="project-details" class="hidden">
+                        <div class="chunks-grid" id="chunks-grid">
+                            <!-- Cards will be injected here -->
+                        </div>
+                        
+                        <button id="stitch-btn" class="glow-on-hover disabled-btn" disabled onclick="stitchVideo()">
+                            <span class="stitch-btn-text">Stitch Final Video</span>
+                            <div class="spinner hidden" id="stitch-spinner"></div>
+                        </button>
+                    </div>
                 </div>
                 
-                <div class="terminal-container hidden" id="stitch-terminal-container" style="flex: 1;">
+                <!-- RIGHT COLUMN: LOGS -->
+                <div class="terminal-container" id="stitch-terminal-container">
                     <div class="terminal-header">
                         <div class="dots">
                             <span class="dot red"></span>
@@ -93,7 +100,10 @@
                         </div>
                         <span class="terminal-title">FFmpeg Stitch Engine Logs</span>
                     </div>
-                    <div class="terminal-body" id="stitch-terminal"></div>
+                    <div class="terminal-body" id="stitch-terminal">
+                        <p class="info">[SYSTEM] FFmpeg Stitch Engine ready.</p>
+                        <p>[LOG] Select a project to view chunks and start rendering logs...</p>
+                    </div>
                 </div>
             </div>
         </main>

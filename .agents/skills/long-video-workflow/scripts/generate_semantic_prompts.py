@@ -22,14 +22,21 @@ def generate_prompts(chunk_index, transcript_path):
     words_data = data['words']
 
     client = genai.Client(api_key=api_key)
-    
-    sys_instruction = """You are an expert director for an educational YouTube doodle animation channel.
+
+    # --- FIX 1: Dynamic scene count based on ~70-80 chars/scene ---
+    char_count = len(text_content)
+    target_scenes = max(10, round(char_count / 75))
+    min_scenes = max(8, round(char_count / 90))
+    max_scenes = max(target_scenes + 5, round(char_count / 60))
+    print(f"[PLAN] Chunk has {char_count} chars → targeting {target_scenes} scenes (range: {min_scenes}–{max_scenes})")
+
+    sys_instruction = f"""You are an expert director for an educational YouTube doodle animation channel.
 Your task is to break down a provided text into a chronological sequence of highly visual, impactful scenes (1-4 seconds each).
 For each scene, identify the EXACT word in the text where the cut should happen (the "target_word") and describe the visual scene ("visual").
 
 CRITICAL TIMING & PACING RULES:
 1. You MUST process the ENTIRE provided text from the very first word to the very last word. Do not skip, summarize, or truncate any parts.
-2. A text of this length MUST yield between 20 to 40 scenes. You must pick a new `target_word` roughly every 15 to 30 words.
+2. This text is {char_count} characters long. You MUST yield between {min_scenes} to {max_scenes} scenes (target: {target_scenes}). Pick a new target_word roughly every 60 to 90 characters of text.
 3. Target Word: Must be exactly as it appears in the text, sequentially.
 4. Visual pacing: Steady and engaging. Each scene should last between 1 to 4 seconds. Avoid making scenes less than 1 second or longer than 4 seconds.
 5. Character Lock: Use the exact literal string "[MC]" anytime you refer to the main character. Do NOT type out the full description. Example: "[MC] holding a spear".
@@ -52,6 +59,7 @@ Return a strictly valid JSON array of objects, where each object has:
             system_instruction=sys_instruction,
             response_mime_type="application/json",
             max_output_tokens=32768,
+            temperature=1.0,
             safety_settings=[
                 types.SafetySetting(
                     category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
@@ -90,12 +98,17 @@ Return a strictly valid JSON array of objects, where each object has:
 
     compiled_shots = []
     search_start_idx = 0
+    miss_count = 0
+
+    # --- FIX 2: Expanded match window (150 words) + miss logging ---
+    MATCH_WINDOW = 150
 
     for shot in semantic_map:
         target_word = shot.get('target_word', '')
         
-        # Find the word in words_data starting from search_start_idx, but only look ahead 100 words
-        search_limit = min(search_start_idx + 100, len(words_data))
+        # Find the word in words_data starting from search_start_idx
+        search_limit = min(search_start_idx + MATCH_WINDOW, len(words_data))
+        matched = False
         for i in range(search_start_idx, search_limit):
             # Case insensitive, removing punctuation for matching
             w_clean = re.sub(r'[^\w\s]', '', words_data[i]['word'].lower())
@@ -109,11 +122,18 @@ Return a strictly valid JSON array of objects, where each object has:
                     "end": words_data[i]['end']
                 })
                 search_start_idx = i + 1
+                matched = True
                 break
+
+        if not matched:
+            miss_count += 1
+            print(f"[MISS] target_word '{target_word}' not found in window [{search_start_idx}, {search_limit - 1}]. Scene dropped. ({miss_count} total misses so far)")
 
     if not compiled_shots:
         print("Error: Could not match any target words to the transcript.")
         return
+
+    print(f"[SUMMARY] Matched {len(compiled_shots)}/{len(semantic_map)} scenes. Dropped {miss_count} due to word match failure.")
 
     # THE ANCHOR FIX: Force the first image to start exactly when the audio starts (0.0s).
     compiled_shots[0]['start'] = 0.0
@@ -135,6 +155,10 @@ Return a strictly valid JSON array of objects, where each object has:
             
         compiled_shots[i]['end'] = end
         compiled_shots[i]['duration'] = duration
+
+        # --- FIX 3: Warn about long pauses caused by upstream dropped scenes ---
+        if duration > 8.0:
+            print(f"[WARNING] Scene {i+1} ('{compiled_shots[i]['target_word']}') has duration {duration:.2f}s — likely caused by dropped scenes. Run ✂️ Fix >8s Scenes in the UI.")
 
     base_template = "Hand-drawn 2D doodle cartoon animation, flat colors, bold black outlines, slightly imperfect sketchy marker lines, {visual}, stark white background, no gradients, no shadows, no textures, no photorealism, no 3D, 16:9 aspect ratio, educational YouTube explainer doodle style."
     main_character_desc = "a primitive prehistoric male stick figure wearing animal skins"
