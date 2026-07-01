@@ -96,7 +96,14 @@ form.addEventListener('submit', async (e) => {
         if (data.status === 'success') {
             appendLog(terminal, `[SYSTEM] Script uploaded successfully. Initializing workspace: ${data.project_name}`);
             
-            const streamUrl = `/api/stream?project_name=${encodeURIComponent(data.project_name)}&file_path=${encodeURIComponent(data.file_path)}&voice_id=${encodeURIComponent(data.voice_id)}&model_id=${encodeURIComponent(data.model_id)}`;
+            // Save project to LocalStorage
+            let savedProjects = JSON.parse(localStorage.getItem('sticky_projects') || '[]');
+            if (!savedProjects.includes(data.project_id)) {
+                savedProjects.push(data.project_id);
+                localStorage.setItem('sticky_projects', JSON.stringify(savedProjects));
+            }
+
+            const streamUrl = `/api/stream?project_id=${encodeURIComponent(data.project_id)}&file_path=${encodeURIComponent(data.file_path)}&voice_id=${encodeURIComponent(data.voice_id)}&model_id=${encodeURIComponent(data.model_id)}`;
             const eventSource = new EventSource(streamUrl);
             
             eventSource.onmessage = function(event) {
@@ -141,14 +148,25 @@ async function fetchProjects() {
     selector.innerHTML = '<option value="">Loading...</option>';
     
     try {
-        const res = await fetch('/api/projects');
+        let savedProjects = JSON.parse(localStorage.getItem('sticky_projects') || '[]');
+        if (savedProjects.length === 0) {
+            selector.innerHTML = '<option value="">-- No projects found --</option>';
+            document.getElementById('project-details').classList.add('hidden');
+            return;
+        }
+
+        const res = await fetch('/api/projects/list', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ projects: savedProjects })
+        });
         const data = await res.json();
         
         selector.innerHTML = '<option value="">-- Select a project --</option>';
         data.projects.forEach(p => {
             const opt = document.createElement('option');
-            opt.value = p;
-            opt.textContent = p.toUpperCase();
+            opt.value = p.id;
+            opt.textContent = p.name;
             selector.appendChild(opt);
         });
         document.getElementById('project-details').classList.add('hidden');
@@ -177,6 +195,19 @@ async function loadProjectDetails() {
         
         grid.innerHTML = '';
         
+        // Add Download Video button at the top if video is ready
+        if (data.video_ready) {
+            const vidCard = document.createElement('div');
+            vidCard.className = 'chunk-card ready';
+            vidCard.style.gridColumn = '1 / -1';
+            vidCard.style.textAlign = 'center';
+            vidCard.innerHTML = `
+                <h3>🎉 Video Ready!</h3>
+                <a href="/api/projects/${projName}/download/video" class="action-btn" style="display:inline-block; margin-top:10px; background:#00f2fe; color:#000; text-decoration:none;">⬇️ Download Final Video</a>
+            `;
+            grid.appendChild(vidCard);
+        }
+        
         data.chunks.forEach(c => {
             const card = document.createElement('div');
             card.className = `chunk-card ${c.ready ? 'ready' : 'waiting'}`;
@@ -193,8 +224,20 @@ async function loadProjectDetails() {
                 <div class="audit-badge ${auditClass}">${auditText}</div>
                 <div class="status-badge">${c.ready ? '🟢 Ready to Stitch' : '🟡 Missing Images'}</div>
                 
+                <div style="margin: 10px 0; display:flex; gap:5px; flex-wrap:wrap;">
+                    <a href="/api/projects/${projName}/download/prompts" class="action-btn" style="flex:1; text-align:center; font-size:0.8rem; text-decoration:none;">⬇️ Prompts</a>
+                    <a href="/api/projects/${projName}/download/audio" class="action-btn" style="flex:1; text-align:center; font-size:0.8rem; text-decoration:none;">⬇️ Audio</a>
+                </div>
+
+                ${!c.ready ? `
+                <div style="margin-bottom: 10px; padding:10px; border:1px dashed rgba(255,255,255,0.3); border-radius:5px; text-align:center;">
+                    <label style="font-size:0.8rem; color:#aaa;">Upload Images (001.png, ...)</label>
+                    <input type="file" multiple accept="image/*" onchange="uploadImages(event, '${projName}', '${c.chunk}')" style="display:block; width:100%; margin-top:5px; font-size:0.8rem;">
+                </div>
+                ` : ''}
+
                 <div class="chunk-actions">
-                    <button class="action-btn reprompt-btn" onclick="repromptChunk('${projName}', '${c.chunk}')">🔄 Regenerate Prompts</button>
+                    <button class="action-btn reprompt-btn" onclick="repromptChunk('${projName}', '${c.chunk}')">🔄 Regenerate</button>
                     ${!c.audit_pass ? `<button class="action-btn reprompt-btn" style="background: rgba(255, 60, 60, 0.2);" onclick="surgeryChunk('${projName}', '${c.chunk}')">✂️ Fix >8s Scenes</button>` : ''}
                     <button class="action-btn stitch-chunk-btn" onclick="stitchSingleChunk('${projName}', '${c.chunk}')" ${c.ready ? '' : 'disabled'}>🎬 Stitch Chunk</button>
                 </div>
@@ -211,6 +254,39 @@ async function loadProjectDetails() {
         }
     } catch (e) {
         grid.innerHTML = '<div style="color: red">Error loading details.</div>';
+    }
+}
+
+async function uploadImages(event, projName, chunkId) {
+    const files = event.target.files;
+    if (files.length === 0) return;
+    
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+        formData.append("files", files[i]);
+    }
+    
+    const originalText = event.target.previousElementSibling.textContent;
+    event.target.previousElementSibling.textContent = "Uploading...";
+    event.target.disabled = true;
+    
+    try {
+        const res = await fetch(`/api/projects/${projName}/upload/${chunkId}`, {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            loadProjectDetails(); // refresh
+        } else {
+            alert('Upload failed: ' + data.message);
+            event.target.previousElementSibling.textContent = originalText;
+            event.target.disabled = false;
+        }
+    } catch (e) {
+        alert('Upload error');
+        event.target.previousElementSibling.textContent = originalText;
+        event.target.disabled = false;
     }
 }
 
