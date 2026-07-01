@@ -2,11 +2,16 @@ import argparse
 import json
 import os
 import re
+import sys
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
 load_dotenv()
+
+# Force UTF-8 stdout so Unicode chars don't crash on Windows subprocess pipes
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
 
 # --- Constants ---
 CONTINUITY_PREFIX = (
@@ -57,7 +62,7 @@ def generate_prompts(chunk_index, transcript_path):
     audio_min     = max(8, round(audio_end / MAX_SCENE_DURATION))
     min_scenes    = max(audio_min, round(char_count / 90))
     max_scenes    = max(target_scenes + 5, round(char_count / 60))
-    print(f"[PLAN] {char_count} chars | {total_words} words | {audio_end:.1f}s audio → target {target_scenes} scenes ({min_scenes}–{max_scenes})")
+    print(f"[PLAN] {char_count} chars | {total_words} words | {audio_end:.1f}s audio -> target {target_scenes} scenes ({min_scenes}-{max_scenes})")
 
     # --- Build compact word index for Gemini (Level 1: direct index, no text matching) ---
     word_index = build_compact_word_index(words_data)
@@ -131,7 +136,7 @@ OUTPUT — strictly valid JSON array only, no extra text:
 
         # Validate: must be int, in bounds, strictly ascending
         if not isinstance(wi, int) or wi < 0 or wi >= total_words:
-            print(f"[SKIP] wi={wi!r} out of bounds (0–{total_words - 1}). Dropped.")
+            print(f"[SKIP] wi={wi!r} out of bounds (0-{total_words - 1}). Dropped.")
             invalid_count += 1
             continue
         if wi <= last_wi:
@@ -190,7 +195,7 @@ OUTPUT — strictly valid JSON array only, no extra text:
                 }
                 compiled_shots.insert(i + 1, fill_shot)
                 auto_fills += 1
-                print(f"[AUTO-FILL] Gap {gap:.2f}s between scenes {i+1}↔{i+2} → inserted fill at wi={best_wi} ({fill_start:.2f}s)")
+                print(f"[AUTO-FILL] Gap {gap:.2f}s between scenes {i+1}<->{i+2} -> inserted fill at wi={best_wi} ({fill_start:.2f}s)")
                 # Do NOT increment i; re-check the new (possibly still large) first half
             else:
                 i += 1  # no word found in gap (shouldn't happen), move on
@@ -228,7 +233,7 @@ OUTPUT — strictly valid JSON array only, no extra text:
             "duration": end_gap,
         }
         compiled_shots.append(fill)
-        print(f"[COVERAGE] Fill scene: {last_end:.2f}s → {audio_end:.2f}s")
+        print(f"[COVERAGE] Fill scene: {last_end:.2f}s -> {audio_end:.2f}s")
 
     # --- Build final prompt objects ---
     prompts = []
@@ -291,7 +296,7 @@ OUTPUT — strictly valid JSON array only, no extra text:
     with open(json_path, 'w', encoding='utf-8') as f:
         json.dump(out_data, f, indent=2, ensure_ascii=False)
 
-    print(f"[DONE] Compilation complete → {output_dir} | {len(prompts)} scenes | {audio_end:.2f}s covered.")
+    print(f"[DONE] Compilation complete -> {output_dir} | {len(prompts)} scenes | {audio_end:.2f}s covered.")
 
 
 if __name__ == "__main__":

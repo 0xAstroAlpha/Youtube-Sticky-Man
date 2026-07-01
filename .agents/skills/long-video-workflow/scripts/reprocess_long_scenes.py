@@ -2,11 +2,17 @@ import argparse
 import json
 import os
 import re
+import sys
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
 load_dotenv()
+
+# Force UTF-8 stdout so Unicode chars don't crash on Windows subprocess pipes
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+
 
 # --- Constants (must match generate_semantic_prompts.py) ---
 CONTINUITY_PREFIX = (
