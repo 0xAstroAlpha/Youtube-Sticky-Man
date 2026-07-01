@@ -144,7 +144,7 @@ Return a strictly valid JSON array of objects, where each object has:
             "duration": shot['duration']
           },
           "output": {
-            "file": f"{(i+1):04d}.png",
+            "file": f"{(i+1):03d}.png",
             "format": "png"
           },
           "refs": [],

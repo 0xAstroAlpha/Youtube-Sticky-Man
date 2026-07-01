@@ -50,9 +50,33 @@ def stitch_project(project_dir, specific_chunk=None):
         image_files = sorted(glob.glob(os.path.join(images_dir, "*.*")))
         image_files = [img for img in image_files if img.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]
         
-        if len(image_files) < len(prompts):
-            print(f"[ERROR] Chunk {c}: Found {len(image_files)} images, but need {len(prompts)}. Aborting.")
-            return
+        actual_images = []
+        json_updated = False
+        
+        for i, p in enumerate(prompts):
+            prefix = f"{(i+1):03d}"
+            # Support both new 001 and legacy 0001
+            legacy_prefix = f"{(i+1):04d}"
+            
+            matched = [img for img in image_files if os.path.basename(img).startswith(prefix) or os.path.basename(img).startswith(legacy_prefix)]
+            
+            if not matched:
+                print(f"[ERROR] Chunk {c}: Missing image starting with {prefix} (or {legacy_prefix}) for shot {i+1}. Aborting.")
+                return
+            
+            chosen_img = matched[0]
+            actual_images.append(chosen_img)
+            
+            # Update the JSON so Kdenlive reads the correct file name with suffix
+            actual_filename = os.path.basename(chosen_img)
+            if 'output' in p and p['output'].get('file') != actual_filename:
+                p['output']['file'] = actual_filename
+                json_updated = True
+                
+        if json_updated:
+            print(f"[INFO] Updating {json_path} to sync filenames with suffixes...")
+            with open(json_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2)
             
         print(f"[INFO] Generating FFmpeg concat file for chunk {c}...")
         with open(concat_txt, 'w', encoding='utf-8') as f:
@@ -62,11 +86,11 @@ def stitch_project(project_dir, specific_chunk=None):
                 duration = end_time - start_time
                 if duration <= 0: duration = 0.5
                 
-                img_path = os.path.abspath(image_files[i]).replace("\\", "/")
+                img_path = os.path.abspath(actual_images[i]).replace("\\", "/")
                 f.write(f"file '{img_path}'\n")
                 f.write(f"duration {duration}\n")
                 
-            last_img_path = os.path.abspath(image_files[-1]).replace("\\", "/")
+            last_img_path = os.path.abspath(actual_images[-1]).replace("\\", "/")
             f.write(f"file '{last_img_path}'\n")
 
         print(f"[INFO] Rendering MP4 for chunk {c}...")
