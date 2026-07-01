@@ -72,27 +72,29 @@
                 <button class="refresh-btn" onclick="fetchProjects()">Refresh</button>
             </div>
             
-            <div id="project-details" class="hidden">
-                <div class="chunks-grid" id="chunks-grid">
-                    <!-- Cards will be injected here -->
+            <div class="manage-flex-wrapper" id="manage-flex-wrapper">
+                <div id="project-details" class="hidden" style="flex: 1;">
+                    <div class="chunks-grid" id="chunks-grid">
+                        <!-- Cards will be injected here -->
+                    </div>
+                    
+                    <button id="stitch-btn" class="glow-on-hover disabled-btn" disabled onclick="stitchVideo()">
+                        <span class="stitch-btn-text">Stitch Final Video</span>
+                        <div class="spinner hidden" id="stitch-spinner"></div>
+                    </button>
                 </div>
                 
-                <button id="stitch-btn" class="glow-on-hover disabled-btn" disabled onclick="stitchVideo()">
-                    <span class="stitch-btn-text">Stitch Final Video</span>
-                    <div class="spinner hidden" id="stitch-spinner"></div>
-                </button>
-            </div>
-            
-            <div class="terminal-container hidden" id="stitch-terminal-container">
-                <div class="terminal-header">
-                    <div class="dots">
-                        <span class="dot red"></span>
-                        <span class="dot yellow"></span>
-                        <span class="dot green"></span>
+                <div class="terminal-container hidden" id="stitch-terminal-container" style="flex: 1;">
+                    <div class="terminal-header">
+                        <div class="dots">
+                            <span class="dot red"></span>
+                            <span class="dot yellow"></span>
+                            <span class="dot green"></span>
+                        </div>
+                        <span class="terminal-title">FFmpeg Stitch Engine Logs</span>
                     </div>
-                    <span class="terminal-title">FFmpeg Stitch Engine Logs</span>
+                    <div class="terminal-body" id="stitch-terminal"></div>
                 </div>
-                <div class="terminal-body" id="stitch-terminal"></div>
             </div>
         </main>
     </div>

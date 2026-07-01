@@ -465,3 +465,45 @@ input[type="text"]:focus {
     border-color: var(--primary);
     box-shadow: 0 0 10px rgba(0, 242, 254, 0.2);
 }
+
+/* Widescreen Layout Adjustments */
+@media (min-width: 1024px) {
+    .container {
+        max-width: 1400px;
+        width: 95%;
+    }
+    
+    #create-tab {
+        display: flex;
+        gap: 3rem;
+        align-items: flex-start;
+    }
+    
+    #create-tab > form {
+        flex: 1;
+    }
+    
+    #create-tab > .terminal-container {
+        flex: 1;
+        margin-top: 0;
+        height: 100%;
+        min-height: 400px;
+    }
+    
+    .terminal-body {
+        height: calc(100% - 40px);
+        min-height: 400px;
+    }
+    
+    .manage-flex-wrapper {
+        display: flex;
+        gap: 3rem;
+        align-items: flex-start;
+    }
+    
+    #manage-tab .terminal-container {
+        margin-top: 0;
+        position: sticky;
+        top: 2rem;
+    }
+}
