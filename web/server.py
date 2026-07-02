@@ -318,6 +318,24 @@ async def upload_images(name: str, chunk_id: str, files: List[UploadFile] = File
 
 @app.get("/api/projects/{name}/download/video")
 async def download_video(name: str):
-    video_path = os.path.join(name, "output", "final_video.mp4")
+    video_path = os.path.join(name, f"{name}_final.mp4")
     if not os.path.exists(video_path): return JSONResponse(status_code=404, content={"message": "Video not found"})
     return FileResponse(video_path, filename=f"{name}_final_video.mp4")
+
+@app.get("/api/projects/{name}/download/kdenlive")
+async def download_all_kdenlive(name: str):
+    if not os.path.exists(name): return JSONResponse(status_code=404, content={"message": "Project not found"})
+    files = glob.glob(os.path.join(name, "kdenlive_chunk_*", "*.kdenlive"))
+    if not files: return JSONResponse(status_code=404, content={"message": "No Kdenlive projects found"})
+    buf = BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for f in files: zf.write(f, os.path.basename(f))
+    buf.seek(0)
+    return StreamingResponse(buf, media_type="application/zip", headers={"Content-Disposition": f"attachment; filename={name}_kdenlive_projects.zip"})
+
+@app.get("/api/projects/{name}/download/kdenlive/{chunk_id}")
+async def download_chunk_kdenlive(name: str, chunk_id: str):
+    if not os.path.exists(name): return JSONResponse(status_code=404, content={"message": "Project not found"})
+    files = glob.glob(os.path.join(name, f"kdenlive_chunk_{chunk_id}", "*.kdenlive"))
+    if not files: return JSONResponse(status_code=404, content={"message": "Kdenlive project not found for this chunk"})
+    return FileResponse(files[0], filename=os.path.basename(files[0]))

@@ -242,6 +242,7 @@ async function loadProjectDetails() {
                 <div style="margin: 10px 0; display:flex; gap:5px; flex-wrap:wrap;">
                     <a href="/api/projects/${projName}/download/prompts?pwd=${encodeURIComponent(appPwd || '')}" class="action-btn" style="flex:1; text-align:center; font-size:0.8rem; text-decoration:none;">⬇️ Prompts</a>
                     <a href="/api/projects/${projName}/download/audio?pwd=${encodeURIComponent(appPwd || '')}" class="action-btn" style="flex:1; text-align:center; font-size:0.8rem; text-decoration:none;">⬇️ Audio</a>
+                    <a href="/api/projects/${projName}/download/kdenlive/${c.chunk}?pwd=${encodeURIComponent(appPwd || '')}" class="action-btn" style="flex:1; text-align:center; font-size:0.8rem; text-decoration:none;">⬇️ Kdenlive</a>
                 </div>
 
                 ${!c.ready ? `
@@ -260,6 +261,9 @@ async function loadProjectDetails() {
             grid.appendChild(card);
         });
         
+        const kContainer = document.getElementById('kdenlive-download-container');
+        kContainer.innerHTML = `<a href="/api/projects/${projName}/download/kdenlive?pwd=${encodeURIComponent(appPwd || '')}" class="action-btn" style="display:inline-block; margin-top:10px; background:rgba(255, 255, 255, 0.1); color:#fff; text-decoration:none; width: 100%;">⬇️ Download All Kdenlive Projects (ZIP)</a>`;
+
         if (data.total_ready) {
             stitchBtn.disabled = false;
             stitchBtn.classList.remove('disabled-btn');
