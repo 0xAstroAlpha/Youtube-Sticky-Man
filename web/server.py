@@ -209,6 +209,8 @@ async def get_project_details(name: str):
                 
         audit_pass = max_duration <= float(os.getenv("MAX_LONG_PAUSE", "7.0"))
             
+        has_video = os.path.exists(os.path.join(name, f"video_chunk_{chunk_idx}.mp4"))
+            
         chunks_data.append({
             "chunk": chunk_idx,
             "prompts": num_prompts,
@@ -216,7 +218,8 @@ async def get_project_details(name: str):
             "ready": ready,
             "audit_pass": audit_pass,
             "max_duration": round(max_duration, 2),
-            "error": False
+            "error": False,
+            "has_video": has_video
         })
         
     # Check if final video exists
@@ -367,3 +370,16 @@ async def download_chunk_kdenlive(name: str, chunk_id: str):
     files = glob.glob(os.path.join(name, f"kdenlive_chunk_{chunk_id}", "*.kdenlive"))
     if not files: return JSONResponse(status_code=404, content={"message": "Kdenlive project not found for this chunk"})
     return FileResponse(files[0], filename=os.path.basename(files[0]))
+
+@app.get("/api/projects/{name}/download/video/{chunk_id}")
+async def download_chunk_video(name: str, chunk_id: str):
+    video_path = os.path.join(name, f"video_chunk_{chunk_id}.mp4")
+    if not os.path.exists(video_path): return JSONResponse(status_code=404, content={"message": "Video not found"})
+    return FileResponse(video_path, filename=f"{name}_chunk_{chunk_id}.mp4", media_type="video/mp4")
+
+@app.get("/api/projects/{name}/preview/video/{chunk_id}")
+async def preview_chunk_video(name: str, chunk_id: str):
+    video_path = os.path.join(name, f"video_chunk_{chunk_id}.mp4")
+    if not os.path.exists(video_path): return JSONResponse(status_code=404, content={"message": "Video not found"})
+    # Without 'filename', FileResponse defaults to inline, allowing browser to play it
+    return FileResponse(video_path, media_type="video/mp4", headers={"Content-Disposition": "inline"})

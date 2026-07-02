@@ -244,6 +244,12 @@ async function loadProjectDetails() {
                     <a href="/api/projects/${projName}/download/audio?pwd=${encodeURIComponent(appPwd || '')}" class="action-btn" style="flex:1; text-align:center; font-size:0.8rem; text-decoration:none;">⬇️ Audio</a>
                     <a href="/api/projects/${projName}/download/kdenlive/${c.chunk}?pwd=${encodeURIComponent(appPwd || '')}" class="action-btn" style="flex:1; text-align:center; font-size:0.8rem; text-decoration:none;">⬇️ Kdenlive</a>
                 </div>
+                ${c.has_video ? `
+                <div style="margin: 10px 0; display:flex; gap:5px; flex-wrap:wrap;">
+                    <a href="/api/projects/${projName}/preview/video/${c.chunk}?pwd=${encodeURIComponent(appPwd || '')}" target="_blank" class="action-btn" style="flex:1; text-align:center; font-size:0.8rem; text-decoration:none; background:rgba(0, 242, 254, 0.2); color:#fff; border: 1px solid rgba(0, 242, 254, 0.5);">▶️ Preview Video</a>
+                    <a href="/api/projects/${projName}/download/video/${c.chunk}?pwd=${encodeURIComponent(appPwd || '')}" class="action-btn" style="flex:1; text-align:center; font-size:0.8rem; text-decoration:none; background:rgba(0, 242, 254, 0.2); color:#fff; border: 1px solid rgba(0, 242, 254, 0.5);">⬇️ MP4 Video</a>
+                </div>
+                ` : ''}
 
                 ${!c.ready ? `
                 <div style="margin-bottom: 10px; padding:10px; border:1px dashed rgba(255,255,255,0.3); border-radius:5px; text-align:center;">
