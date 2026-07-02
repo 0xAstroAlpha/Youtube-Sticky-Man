@@ -191,7 +191,7 @@ async def get_project_details(name: str):
             if dur > max_duration:
                 max_duration = dur
                 
-        audit_pass = max_duration <= 8.0
+        audit_pass = max_duration <= float(os.getenv("MAX_LONG_PAUSE", "7.0"))
             
         chunks_data.append({
             "chunk": chunk_idx,

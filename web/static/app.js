@@ -123,8 +123,10 @@ form.addEventListener('submit', async (e) => {
             const streamUrl = `/api/stream?project_name=${encodeURIComponent(data.project_name)}&file_path=${encodeURIComponent(data.file_path)}&voice_id=${encodeURIComponent(data.voice_id)}&model_id=${encodeURIComponent(data.model_id)}&pwd=${encodeURIComponent(appPwd || '')}`;
             const eventSource = new EventSource(streamUrl);
             
+            let isDone = false;
             eventSource.onmessage = function(event) {
                 if (event.data === '[DONE]') {
+                    isDone = true;
                     eventSource.close();
                     appendLog(terminal, '[SYSTEM] Execution Terminated Safely.');
                     btnText.classList.remove('hidden');
@@ -139,10 +141,12 @@ form.addEventListener('submit', async (e) => {
             
             eventSource.onerror = function(err) {
                 eventSource.close();
-                appendLog(terminal, '[ERROR] Connection to streaming server lost. Ensure backend is running.');
-                btnText.classList.remove('hidden');
-                spinner.classList.add('hidden');
-                generateBtn.disabled = false;
+                if (!isDone) {
+                    appendLog(terminal, '[ERROR] Connection to streaming server lost. Ensure backend is running.');
+                    btnText.classList.remove('hidden');
+                    spinner.classList.add('hidden');
+                    generateBtn.disabled = false;
+                }
             };
             
         } else {
@@ -318,8 +322,10 @@ async function surgeryChunk(projName, chunkId) {
     const streamUrl = `/api/projects/${projName}/surgery/${chunkId}?pwd=${encodeURIComponent(appPwd || '')}`;
     const eventSource = new EventSource(streamUrl);
     
+    let isDone = false;
     eventSource.onmessage = function(event) {
         if (event.data === '[DONE]') {
+            isDone = true;
             eventSource.close();
             appendLog(term, '[SYSTEM] Surgery Completed! Refreshing Dashboard...');
             loadProjectDetails();
@@ -330,7 +336,7 @@ async function surgeryChunk(projName, chunkId) {
     
     eventSource.onerror = function(err) {
         eventSource.close();
-        appendLog(term, '[ERROR] Connection lost during surgery.');
+        if (!isDone) appendLog(term, '[ERROR] Connection lost during surgery.');
     };
 }
 
@@ -344,8 +350,10 @@ async function repromptChunk(projName, chunkId) {
     const streamUrl = `/api/projects/${projName}/re-prompt/${chunkId}?pwd=${encodeURIComponent(appPwd || '')}`;
     const eventSource = new EventSource(streamUrl);
     
+    let isDone = false;
     eventSource.onmessage = function(event) {
         if (event.data === '[DONE]') {
+            isDone = true;
             eventSource.close();
             appendLog(term, '[SYSTEM] Regeneration Completed! Refreshing Dashboard...');
             loadProjectDetails();
@@ -356,7 +364,7 @@ async function repromptChunk(projName, chunkId) {
     
     eventSource.onerror = function(err) {
         eventSource.close();
-        appendLog(term, '[ERROR] Connection lost during regeneration.');
+        if (!isDone) appendLog(term, '[ERROR] Connection lost during regeneration.');
     };
 }
 
@@ -370,8 +378,10 @@ async function stitchSingleChunk(projName, chunkId) {
     const streamUrl = `/api/projects/${projName}/stitch/${chunkId}?pwd=${encodeURIComponent(appPwd || '')}`;
     const eventSource = new EventSource(streamUrl);
     
+    let isDone = false;
     eventSource.onmessage = function(event) {
         if (event.data === '[DONE]') {
+            isDone = true;
             eventSource.close();
             appendLog(term, '[SYSTEM] Single Chunk Stitching Completed!');
         } else {
@@ -381,7 +391,7 @@ async function stitchSingleChunk(projName, chunkId) {
     
     eventSource.onerror = function(err) {
         eventSource.close();
-        appendLog(term, '[ERROR] Connection lost during stitching.');
+        if (!isDone) appendLog(term, '[ERROR] Connection lost during stitching.');
     };
 }
 
@@ -405,14 +415,16 @@ async function stitchVideo() {
     const streamUrl = `/api/projects/${projName}/stitch?pwd=${encodeURIComponent(appPwd || '')}`;
     const eventSource = new EventSource(streamUrl);
     
+    let isDone = false;
     eventSource.onmessage = function(event) {
         if (event.data === '[DONE]') {
+            isDone = true;
             eventSource.close();
-            appendLog(term, '[SYSTEM] Full Stitching Completed Successfully!');
+            appendLog(term, '[SYSTEM] Stitching Completed! Final Video is Ready.');
             sText.classList.remove('hidden');
             sSpin.classList.add('hidden');
             btn.disabled = false;
-            sText.textContent = "Final Video Rendered!";
+            loadProjectDetails();
         } else {
             appendLog(term, event.data);
         }
@@ -420,9 +432,11 @@ async function stitchVideo() {
     
     eventSource.onerror = function(err) {
         eventSource.close();
-        appendLog(term, '[ERROR] Connection lost during render.');
-        sText.classList.remove('hidden');
-        sSpin.classList.add('hidden');
-        btn.disabled = false;
+        if (!isDone) {
+            appendLog(term, '[ERROR] Connection lost during stitching.');
+            sText.classList.remove('hidden');
+            sSpin.classList.add('hidden');
+            btn.disabled = false;
+        }
     };
 }

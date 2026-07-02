@@ -27,7 +27,7 @@ BASE_TEMPLATE = (
 )
 MAIN_CHARACTER_DESC = "a primitive prehistoric male stick figure wearing animal skins"
 PREEMPT_OFFSET = 0.1
-LONG_SCENE_THRESHOLD = 8.0
+LONG_SCENE_THRESHOLD = float(os.getenv("MAX_LONG_PAUSE", "7.0"))
 
 
 def build_segment_index(words_data, seg_start_abs, seg_end_abs):
