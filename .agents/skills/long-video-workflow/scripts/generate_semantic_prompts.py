@@ -42,12 +42,15 @@ def build_compact_word_index(words_data):
 
 def generate_prompts(chunk_index, transcript_path):
     api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        print("Error: GEMINI_API_KEY not found in .env")
-        return
-
-    model_id = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
-    print(f"[MODEL] Using {model_id}")
+    nvidia_api_key = os.getenv("NVIDIA_API_KEY")
+    llm_provider = os.getenv("LLM_PROVIDER", "gemini").lower()
+    
+    if llm_provider == "nvidia":
+        model_id = os.getenv("NVIDIA_MODEL", "minimaxai/minimax-m3")
+    else:
+        model_id = os.getenv("GEMINI_MODEL", "gemini-3.1-pro-preview")
+        
+    print(f"[MODEL] Using {model_id} via {llm_provider.upper()}")
 
     with open(transcript_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
@@ -73,7 +76,9 @@ def generate_prompts(chunk_index, transcript_path):
     word_index = build_compact_word_index(words_data)
     word_index_json = json.dumps(word_index, ensure_ascii=False, separators=(',', ':'))
 
-    client = genai.Client(api_key=api_key)
+    api_key = os.getenv("GEMINI_API_KEY")
+    nvidia_api_key = os.getenv("NVIDIA_API_KEY")
+    llm_provider = os.getenv("LLM_PROVIDER", "gemini").lower()
 
     sys_instruction = f"""You are an expert director for an educational YouTube doodle animation channel.
 You receive spoken words with precise timestamps as arrays: [word_index, word, start_seconds, end_seconds].
@@ -97,39 +102,78 @@ OUTPUT — strictly valid JSON array only, no extra text:
   {{"wi": 4, "visual": "next scene", "cont": true}}
 ]"""
 
-    print("Calling Gemini API (single pass -- direct word-index mode)...")
-    try:
-        response = client.models.generate_content(
-            model=model_id,
-            contents=word_index_json,
-            config=types.GenerateContentConfig(
-                system_instruction=sys_instruction,
-                response_mime_type="application/json",
-                max_output_tokens=32768,
-                temperature=1.0,
-                safety_settings=[
-                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,       threshold=types.HarmBlockThreshold.BLOCK_NONE),
-                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HARASSMENT,         threshold=types.HarmBlockThreshold.BLOCK_NONE),
-                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,  threshold=types.HarmBlockThreshold.BLOCK_NONE),
-                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,  threshold=types.HarmBlockThreshold.BLOCK_NONE),
-                ]
+    if llm_provider == "nvidia" and nvidia_api_key:
+        print(f"Calling NVIDIA API ({model_id}) (single pass)...")
+        import requests
+        
+        invoke_url = "https://integrate.api.nvidia.com/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {nvidia_api_key}",
+            "Accept": "application/json"
+        }
+        
+        # Minimax multimodal model performs better with system prompt as part of user content if strictly required,
+        # but we will try standard system role first or just merge it into user role.
+        combined_prompt = f"{sys_instruction}\n\nInput JSON Word Index:\n{word_index_json}"
+        
+        payload = {
+            "model": model_id,
+            "messages": [{"role": "user", "content": combined_prompt}],
+            "max_tokens": 8192,
+            "temperature": 1.0,
+            "top_p": 0.95,
+            "stream": False
+        }
+        
+        try:
+            resp = requests.post(invoke_url, headers=headers, json=payload, timeout=120)
+            resp.raise_for_status()
+            data_resp = resp.json()
+            raw_resp = data_resp['choices'][0]['message']['content'].strip()
+        except Exception as e:
+            err = str(e)
+            print(f"[ERROR] Nvidia API error: {err[:300]}")
+            return
+    else:
+        print(f"Calling Gemini API ({model_id}) (single pass -- direct word-index mode)...")
+        if not api_key:
+            print("[ERROR] GEMINI_API_KEY is not set.")
+            return
+            
+        client = genai.Client(api_key=api_key)
+        try:
+            response = client.models.generate_content(
+                model=model_id,
+                contents=word_index_json,
+                config=types.GenerateContentConfig(
+                    system_instruction=sys_instruction,
+                    response_mime_type="application/json",
+                    max_output_tokens=32768,
+                    temperature=1.0,
+                    safety_settings=[
+                        types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,       threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                        types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HARASSMENT,         threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                        types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,  threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                        types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,  threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                    ]
+                )
             )
-        )
-    except Exception as e:
-        err = str(e)
-        if '404' in err or 'NOT_FOUND' in err:
-            print(f"[ERROR] Model '{model_id}' not found or not available.")
-            print("[HINT] Set GEMINI_MODEL in your .env to one of:")
-            print("  gemini-2.0-flash          (recommended, fast & cheap)")
-            print("  gemini-2.5-flash-preview-05-20")
-            print("  gemini-1.5-flash")
-            print("  gemini-1.5-pro")
-        else:
-            print(f"[ERROR] Gemini API error: {err[:300]}")
-        return
+            raw_resp = response.text.strip()
+        except Exception as e:
+            err = str(e)
+            if '404' in err or 'NOT_FOUND' in err:
+                print(f"[ERROR] Model '{model_id}' not found or not available.")
+            else:
+                print(f"[ERROR] Gemini API error: {err[:300]}")
+            return
 
     try:
-        raw_resp = response.text.strip()
+        # Extract JSON strictly if model outputs markdown blocks
+        if "```json" in raw_resp:
+            raw_resp = raw_resp.split("```json")[1].split("```")[0].strip()
+        elif "```" in raw_resp:
+            raw_resp = raw_resp.split("```")[1].split("```")[0].strip()
+            
         # Cleanup 1: duplicated closing bracket e.g. "]\n]"
         if raw_resp.endswith("]\n]") or raw_resp.endswith("]]"):
             raw_resp = raw_resp.rsplit(']', 1)[0].strip()
