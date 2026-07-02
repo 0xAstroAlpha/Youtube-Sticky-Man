@@ -56,6 +56,13 @@ async def process_script(file: UploadFile = File(...), voice_id: str = Form("QzT
     with open(file_path, "wb") as f:
         f.write(content)
         
+    # Cleanup old chunks if this is a re-upload to avoid ghost chunks
+    import glob
+    for old_file in glob.glob(os.path.join(project_name, "chunk_*.txt")): os.remove(old_file)
+    for old_file in glob.glob(os.path.join(project_name, "audio_chunk_*.mp3")): os.remove(old_file)
+    for old_file in glob.glob(os.path.join(project_name, "transcript_chunk_*.json")): os.remove(old_file)
+    for old_file in glob.glob(os.path.join(project_name, "image_prompts_chunk_*.json")): os.remove(old_file)
+        
     return {"status": "success", "project_name": project_name, "file_path": file_path, "voice_id": voice_id, "model_id": model_id}
 
 @app.get("/api/stream")
@@ -68,9 +75,12 @@ async def stream_logs(request: Request, project_name: str, file_path: str, voice
         process = await asyncio.create_subprocess_exec(*chunker_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
         
         while True:
-            line = await process.stdout.readline()
-            if not line: break
-            yield f"data: {line.decode('utf-8').strip()}\n\n"
+            try:
+                line = await asyncio.wait_for(process.stdout.readline(), timeout=15.0)
+                if not line: break
+                yield f"data: {line.decode('utf-8').strip()}\n\n"
+            except asyncio.TimeoutError:
+                yield ": ping\n\n"
         await process.wait()
         
         chunks = [f for f in os.listdir(project_name) if f.startswith("chunk_") and f.endswith(".txt")]
@@ -91,18 +101,24 @@ async def stream_logs(request: Request, project_name: str, file_path: str, voice
                 tts_cmd = ["python", ".agents/skills/long-video-workflow/scripts/elevenlabs_tts_with_timestamps.py", "--input-file", chunk_path, "--voice-id", voice_id, "--model-id", model_id, "--out-audio", audio_path, "--out-json", json_path]
                 process = await asyncio.create_subprocess_exec(*tts_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
                 while True:
-                    line = await process.stdout.readline()
-                    if not line: break
-                    yield f"data: {line.decode('utf-8').strip()}\n\n"
+                    try:
+                        line = await asyncio.wait_for(process.stdout.readline(), timeout=15.0)
+                        if not line: break
+                        yield f"data: {line.decode('utf-8').strip()}\n\n"
+                    except asyncio.TimeoutError:
+                        yield ": ping\n\n"
                 await process.wait()
             
             yield f"data: [INFO] >>> STEP 3: Generating Semantic Prompts for chunk {chunk_index}...\n\n"
             gemini_cmd = ["python", ".agents/skills/long-video-workflow/scripts/generate_semantic_prompts.py", "--chunk", chunk_index, "--transcript", json_path]
             process = await asyncio.create_subprocess_exec(*gemini_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
             while True:
-                line = await process.stdout.readline()
-                if not line: break
-                yield f"data: {line.decode('utf-8').strip()}\n\n"
+                try:
+                    line = await asyncio.wait_for(process.stdout.readline(), timeout=15.0)
+                    if not line: break
+                    yield f"data: {line.decode('utf-8').strip()}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": ping\n\n"  # Keep-alive for Cloudflare
             await process.wait()
             
         yield f"data: [INFO] >>> PIPELINE COMPLETE! All files and folders are ready in the '{project_name}' directory.\n\n"
@@ -219,9 +235,12 @@ async def stitch_project_all(request: Request, name: str):
         stitch_cmd = ["python", ".agents/skills/long-video-workflow/scripts/stitch_video.py", "--project", name]
         process = await asyncio.create_subprocess_exec(*stitch_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
         while True:
-            line = await process.stdout.readline()
-            if not line: break
-            yield f"data: {line.decode('utf-8').strip()}\n\n"
+            try:
+                line = await asyncio.wait_for(process.stdout.readline(), timeout=15.0)
+                if not line: break
+                yield f"data: {line.decode('utf-8').strip()}\n\n"
+            except asyncio.TimeoutError:
+                yield ": ping\n\n"
         await process.wait()
         yield "data: [DONE]\n\n"
     return StreamingResponse(stitch_generator(), media_type="text/event-stream")
@@ -234,9 +253,12 @@ async def stitch_project_chunk(request: Request, name: str, chunk_id: str):
         stitch_cmd = ["python", ".agents/skills/long-video-workflow/scripts/stitch_video.py", "--project", name, "--chunk", chunk_id]
         process = await asyncio.create_subprocess_exec(*stitch_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
         while True:
-            line = await process.stdout.readline()
-            if not line: break
-            yield f"data: {line.decode('utf-8').strip()}\n\n"
+            try:
+                line = await asyncio.wait_for(process.stdout.readline(), timeout=15.0)
+                if not line: break
+                yield f"data: {line.decode('utf-8').strip()}\n\n"
+            except asyncio.TimeoutError:
+                yield ": ping\n\n"
         await process.wait()
         yield "data: [DONE]\n\n"
     return StreamingResponse(stitch_generator(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"})
@@ -251,9 +273,12 @@ async def reprompt_chunk(request: Request, name: str, chunk_id: str):
         
         process = await asyncio.create_subprocess_exec(*gemini_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
         while True:
-            line = await process.stdout.readline()
-            if not line: break
-            yield f"data: {line.decode('utf-8').strip()}\n\n"
+            try:
+                line = await asyncio.wait_for(process.stdout.readline(), timeout=15.0)
+                if not line: break
+                yield f"data: {line.decode('utf-8').strip()}\n\n"
+            except asyncio.TimeoutError:
+                yield ": ping\n\n"
         await process.wait()
         yield "data: [DONE]\n\n"
     return StreamingResponse(reprompt_generator(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"})
@@ -266,9 +291,12 @@ async def surgery_chunk(request: Request, name: str, chunk_id: str):
         
         process = await asyncio.create_subprocess_exec(*surgery_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
         while True:
-            line = await process.stdout.readline()
-            if not line: break
-            yield f"data: {line.decode('utf-8').strip()}\n\n"
+            try:
+                line = await asyncio.wait_for(process.stdout.readline(), timeout=15.0)
+                if not line: break
+                yield f"data: {line.decode('utf-8').strip()}\n\n"
+            except asyncio.TimeoutError:
+                yield ": ping\n\n"
         await process.wait()
         yield "data: [DONE]\n\n"
     return StreamingResponse(surgery_generator(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"})
